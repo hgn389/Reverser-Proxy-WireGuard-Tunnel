@@ -1,0 +1,17 @@
+.env
+.env.*
+*.key
+*.pem
+*.crt
+*.log
+*.swp
+secrets/
+wireguard/peers/
+dist/
+dist.before-*/
+build/
+rpctl
+rpctl-linux-*
+coverage.out
+coverage/
+*.tar.gz
