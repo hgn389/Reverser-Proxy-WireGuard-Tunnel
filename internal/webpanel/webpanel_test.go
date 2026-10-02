@@ -110,6 +110,25 @@ func TestInitialInstallConfigEnablesDirectAccessWithDomain(t *testing.T) {
 	}
 }
 
+func TestPrivilegedHelperAllowsNginxRuntimeFiles(t *testing.T) {
+	if !strings.HasPrefix(sslRenewNginxRuntimeDropIn, "# Managed by rpctl.\n") {
+		t.Fatal("SSL renewal drop-in is missing its ownership marker")
+	}
+	for _, path := range []string{"-/var/log/nginx", "-/run/nginx.pid"} {
+		if !strings.Contains(helperServiceUnit, path) {
+			t.Fatalf("privileged helper cannot run nginx -t: missing writable path %s", path)
+		}
+		if !strings.Contains(sslRenewNginxRuntimeDropIn, path) {
+			t.Fatalf("SSL renewal cannot reload Nginx: missing writable path %s", path)
+		}
+	}
+	for _, setting := range []string{"UMask=0077", "NoNewPrivileges=true", "PrivateDevices=true", "ProtectSystem=strict", "RestrictSUIDSGID=true"} {
+		if !strings.Contains(sslRenewNginxRuntimeDropIn, setting) {
+			t.Fatalf("SSL renewal drop-in is missing hardening setting %s", setting)
+		}
+	}
+}
+
 func TestUFWRuleDetectionRequiresExactPort(t *testing.T) {
 	status := []byte("Status: active\n\nTo                         Action      From\n--                         ------      ----\n19080/tcp                  ALLOW       Anywhere\n[ 2] 9080/tcp              ALLOW       203.0.113.0/24\n")
 	if !ufwHasRule(status, "9080/tcp") {
@@ -677,6 +696,9 @@ func TestFiveFailedLoginsPersistBlockAndUnblock(t *testing.T) {
 		}
 		if response.Code != want {
 			t.Fatalf("attempt %d status=%d, want %d", attempt, response.Code, want)
+		}
+		if attempt < 5 && response.Header().Get("Content-Type") != "text/html; charset=utf-8" {
+			t.Fatalf("attempt %d returned a non-HTML login page: %q", attempt, response.Header().Get("Content-Type"))
 		}
 	}
 	if blocked, err := server.blocks.IsBlocked("198.51.100.20"); err != nil || !blocked {

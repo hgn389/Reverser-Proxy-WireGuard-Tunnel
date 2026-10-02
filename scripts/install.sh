@@ -314,7 +314,10 @@ flock -n 9 || die 'Another rpctl installer is running.'
 
 # shellcheck disable=SC1091
 . /etc/os-release
-[[ ${ID:-} == ubuntu && ${VERSION_ID:-} == 24.04 ]] || die 'Only Ubuntu Server 24.04 is supported.'
+case "${ID:-}:${VERSION_ID:-}" in
+  ubuntu:22.04|ubuntu:24.04) ;;
+  *) die 'Only Ubuntu Server 22.04 LTS and 24.04 LTS are supported.' ;;
+esac
 
 motd_path=/etc/update-motd.d/99-rpctl
 if [[ -e $motd_path || -L $motd_path ]]; then
@@ -327,6 +330,7 @@ case "$(uname -m)" in
   aarch64) arch=arm64 ;;
   *) die "Unsupported architecture: $(uname -m)" ;;
 esac
+info "Detected supported system: Ubuntu ${VERSION_ID} (${arch})."
 
 has_tty=no
 if /usr/bin/tty -s </dev/tty 2>/dev/null; then
@@ -506,11 +510,20 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/rpctl ssl renew-all
+UMask=0077
 NoNewPrivileges=true
 PrivateTmp=true
+PrivateDevices=true
 ProtectHome=true
 ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
 ReadWritePaths=/etc/rpctl /var/lib/rpctl /run/rpctl
+ReadWritePaths=-/var/log/nginx -/run/nginx.pid
 SERVICE
   cat > "$workdir/rpctl-ssl-renew.timer" <<'TIMER'
 [Unit]

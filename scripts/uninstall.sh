@@ -34,6 +34,12 @@ fi
 rm -- /usr/local/bin/rpctl
 rm -f -- /usr/local/bin/rpctl.previous
 rm -f -- /etc/systemd/system/rpctl-ssl-renew.service /etc/systemd/system/rpctl-ssl-renew.timer
+renew_dropin=/etc/systemd/system/rpctl-ssl-renew.service.d/rpctl-nginx-runtime.conf
+if [[ -f $renew_dropin && ! -L $renew_dropin ]] && \
+   [[ $(sed -n '1p' "$renew_dropin") == '# Managed by rpctl.' ]]; then
+  rm -- "$renew_dropin"
+  rmdir --ignore-fail-on-non-empty -- /etc/systemd/system/rpctl-ssl-renew.service.d
+fi
 rm -f -- /etc/systemd/system/rpctl-web.service /etc/systemd/system/rpctl-web-helper.socket /etc/systemd/system/rpctl-web-helper@.service
 rm -rf -- /etc/rpctl/web
 rm -rf -- /var/lib/rpctl/web

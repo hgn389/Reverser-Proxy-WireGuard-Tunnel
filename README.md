@@ -4,11 +4,22 @@
 
 ### 1. VPS-1 — Reverse Proxy
 
-Run this command on a clean Ubuntu 24.04 VPS:
+This v1.0.2 installer supports **Ubuntu Server 22.04 LTS and 24.04 LTS** on `amd64` and `arm64`. Run this command on a clean VPS:
 
 ```bash
-sudo apt update && sudo apt install -y git && git clone https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel.git rpctl && cd rpctl && sudo bash scripts/install.sh
+sudo apt update && sudo apt install -y ca-certificates curl git && git clone https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel.git rpctl && cd rpctl && sudo bash scripts/install.sh
 ```
+
+The same command is used on Ubuntu 22.04 and Ubuntu 24.04. If an existing checkout reports `Only Ubuntu Server 24.04 is supported`, it contains an installer older than v1.0.2. Update that checkout and confirm the corrected platform check before running it again:
+
+```bash
+cd ~/rpctl
+git pull --ff-only origin main
+grep -n 'ubuntu:22.04' scripts/install.sh
+sudo bash scripts/install.sh
+```
+
+The `grep` command must show `ubuntu:22.04|ubuntu:24.04`. The installer then downloads the latest GitHub Release, so the repository owner must publish the v1.0.2 release assets before this installation is used.
 
 Select **WireGuard private mode** in the installer. The VPS-2 client configuration will be created at:
 
@@ -151,7 +162,7 @@ Run `sudo rpctl wg peer add` once for each new server, copy that peer's configur
 
 Deleted addresses may be reused, so always use the address shown by `sudo rpctl wg peer list` instead of guessing it.
 
-![Web Panel](https://raw.githubusercontent.com/hgn389/Reverser-Proxy-WireGuard-Tunnel/refs/heads/main/images/webpanel.jpg)
+![Web Panel dashboard](images/webpanel.svg)
 
 ## Supported systems and minimum hardware
 
@@ -159,7 +170,7 @@ Install the rpctl server only on the systems listed below. The installer rejects
 
 | Item | Minimum | Recommended |
 |---|---:|---:|
-| Operating system | Ubuntu Server 24.04 LTS | Latest Ubuntu 24.04 point release |
+| Operating system | Ubuntu Server 22.04 LTS | Latest Ubuntu 24.04 point release |
 | Architecture | `amd64` (x86_64) or `arm64` (aarch64) | `amd64` or `arm64` |
 | CPU | 1 vCPU | 1–2 vCPU |
 | RAM | 512 MB | 1 GB |
@@ -167,7 +178,7 @@ Install the rpctl server only on the systems listed below. The installer rejects
 | Free disk space | 2 GB after Ubuntu is installed | 5 GB or more |
 | Access | A root account or a user with sudo | Root/sudo and a public IPv4 address |
 
-The public rpctl server is currently supported only on **Ubuntu Server 24.04 LTS**. Ubuntu 22.04, Debian, CentOS, AlmaLinux, Rocky Linux and other distributions have not been tested and are not supported by the installer.
+The public rpctl server supports **Ubuntu Server 22.04 LTS and 24.04 LTS**. Debian, CentOS, AlmaLinux, Rocky Linux and other distributions have not been tested and are rejected by the installer.
 
 An upstream website server may use another operating system. For example, an Orange Pi running Ubuntu, Debian or Armbian can serve websites behind VPS-1 as long as VPS-1 can reach its HTTP/HTTPS port through a public IP, LAN, WireGuard or Tailscale.
 
@@ -188,11 +199,11 @@ rpctl is a small Nginx reverse proxy and VPN management tool. One static Go bina
 
 The default minimal installation contains Nginx and the rpctl binary. The Web Panel, WireGuard and acme.sh are optional. Portable backup/restore and self-update commands are not implemented yet.
 
-## Install on a clean Ubuntu 24.04 VPS
+## Install on a clean Ubuntu 22.04 or 24.04 VPS
 
 Before installation:
 
-1. Create a fresh Ubuntu Server 24.04 LTS VPS.
+1. Create a fresh Ubuntu Server 22.04 LTS or 24.04 LTS VPS.
 2. Confirm that you can run `sudo` and that the server can access GitHub.
 3. Allow SSH plus ports `80/tcp` and `443/tcp` in the VPS provider firewall. Allow `51820/udp` if WireGuard will be used and `9080/tcp` if direct Web Panel access is required.
 4. If you want SSL immediately, point the domain's A record to the VPS public IPv4 address.
@@ -335,7 +346,7 @@ Cloudflare (optional)
    |
    | HTTPS :443
    v
-VPS-1: public Ubuntu 24.04 server
+VPS-1: public Ubuntu 22.04/24.04 server
   Public IP: VPS1_PUBLIC_IP
   rpctl + Nginx + Let's Encrypt
   WireGuard: 10.77.0.1
@@ -761,7 +772,7 @@ sudo wg show
 
 ## Current limitations
 
-- The installer supports only Ubuntu Server 24.04 LTS for the rpctl server.
+- The installer supports Ubuntu Server 22.04 LTS and 24.04 LTS for the rpctl server.
 - SSL v1 uses Let's Encrypt HTTP-01; DNS-01 is not implemented.
 - Automatic peer allocation currently supports IPv4 WireGuard subnets from `/16` through `/30`.
 - Tailscale addresses are detected, but rpctl does not install or administer Tailscale yet.

@@ -270,6 +270,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		http.SetCookie(w, authCookie(loginCookieName, token, 10*time.Minute, secure))
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusUnauthorized)
 		s.render(w, "login.html", loginData{Version: s.version, CSRF: token, Error: "Invalid username or password."})
 		return

@@ -21,14 +21,17 @@ import (
 )
 
 const (
-	webUser           = "rpweb"
-	webStateDir       = "/var/lib/rpctl/web"
-	webConfigDir      = "/etc/rpctl/web"
-	webServicePath    = "/etc/systemd/system/rpctl-web.service"
-	helperSocketPath  = "/etc/systemd/system/rpctl-web-helper.socket"
-	helperServicePath = "/etc/systemd/system/rpctl-web-helper@.service"
-	acmeExecutable    = "/opt/acme.sh/acme.sh"
-	webFirewallMarker = "/var/lib/rpctl/web-ufw-9080-managed"
+	webUser             = "rpweb"
+	webStateDir         = "/var/lib/rpctl/web"
+	webConfigDir        = "/etc/rpctl/web"
+	webServicePath      = "/etc/systemd/system/rpctl-web.service"
+	helperSocketPath    = "/etc/systemd/system/rpctl-web-helper.socket"
+	helperServicePath   = "/etc/systemd/system/rpctl-web-helper@.service"
+	sslRenewServicePath = "/etc/systemd/system/rpctl-ssl-renew.service"
+	sslRenewDropInDir   = "/etc/systemd/system/rpctl-ssl-renew.service.d"
+	sslRenewDropInPath  = "/etc/systemd/system/rpctl-ssl-renew.service.d/rpctl-nginx-runtime.conf"
+	acmeExecutable      = "/opt/acme.sh/acme.sh"
+	webFirewallMarker   = "/var/lib/rpctl/web-ufw-9080-managed"
 )
 
 type Installer struct {
@@ -240,6 +243,21 @@ func (i Installer) RefreshUnits() error {
 		if err := writeOwnedAtomic(path, []byte(content), 0644, 0, 0); err != nil {
 			return err
 		}
+	}
+	if renewalUnit, err := os.ReadFile(sslRenewServicePath); err == nil {
+		if strings.Contains(string(renewalUnit), "ExecStart=/usr/local/bin/rpctl ssl renew-all") {
+			if err := os.MkdirAll(sslRenewDropInDir, 0755); err != nil {
+				return err
+			}
+			if err := os.Chmod(sslRenewDropInDir, 0755); err != nil {
+				return err
+			}
+			if err := writeOwnedAtomic(sslRenewDropInPath, []byte(sslRenewNginxRuntimeDropIn), 0644, 0, 0); err != nil {
+				return err
+			}
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
 	}
 	if _, err := runSystemctl("daemon-reload"); err != nil {
 		return err
@@ -638,4 +656,22 @@ RestrictRealtime=true
 LockPersonality=true
 ReadWritePaths=/etc/rpctl/sites /etc/nginx/sites-available /etc/nginx/sites-enabled /var/lib/rpctl/rollback /run/rpctl
 ReadWritePaths=-/etc/rpctl/certs -/etc/rpctl/acme -/var/lib/rpctl/acme-webroot -/etc/rpctl/wireguard -/etc/wireguard
+ReadWritePaths=-/var/log/nginx -/run/nginx.pid
+`
+
+const sslRenewNginxRuntimeDropIn = `# Managed by rpctl.
+[Service]
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+ReadWritePaths=-/var/log/nginx -/run/nginx.pid
 `

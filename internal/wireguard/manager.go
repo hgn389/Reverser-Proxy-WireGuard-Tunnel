@@ -92,6 +92,15 @@ func (m Manager) List() ([]Peer, error) {
 	if err := m.prepare(); err != nil {
 		return nil, err
 	}
+	unlock, err := m.lock(syscall.LOCK_SH)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+	return m.listUnlocked()
+}
+
+func (m Manager) listUnlocked() ([]Peer, error) {
 	entries, err := os.ReadDir(m.PeerDir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -137,6 +146,11 @@ func (m Manager) Show(name string) (Peer, error) {
 	if err := m.prepare(); err != nil {
 		return Peer{}, err
 	}
+	unlock, err := m.lock(syscall.LOCK_SH)
+	if err != nil {
+		return Peer{}, err
+	}
+	defer unlock()
 	return m.readPeer(name)
 }
 
@@ -144,6 +158,11 @@ func (m Manager) Config(name string) ([]byte, error) {
 	if err := m.prepare(); err != nil {
 		return nil, err
 	}
+	unlock, err := m.lock(syscall.LOCK_SH)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
 	path, err := m.peerPath(name)
 	if err != nil {
 		return nil, err
@@ -155,7 +174,7 @@ func (m Manager) Add(requestedName string) (Peer, error) {
 	if err := m.prepare(); err != nil {
 		return Peer{}, err
 	}
-	unlock, err := m.lock()
+	unlock, err := m.lock(syscall.LOCK_EX)
 	if err != nil {
 		return Peer{}, err
 	}
@@ -165,7 +184,7 @@ func (m Manager) Add(requestedName string) (Peer, error) {
 	if err != nil {
 		return Peer{}, fmt.Errorf("reading WireGuard server configuration: %w", err)
 	}
-	peers, err := m.List()
+	peers, err := m.listUnlocked()
 	if err != nil {
 		return Peer{}, err
 	}
@@ -244,7 +263,7 @@ func (m Manager) Delete(name string) error {
 	if err := m.prepare(); err != nil {
 		return err
 	}
-	unlock, err := m.lock()
+	unlock, err := m.lock(syscall.LOCK_EX)
 	if err != nil {
 		return err
 	}
@@ -253,7 +272,7 @@ func (m Manager) Delete(name string) error {
 	if err != nil {
 		return err
 	}
-	peers, err := m.List()
+	peers, err := m.listUnlocked()
 	if err != nil {
 		return err
 	}
@@ -621,7 +640,10 @@ func (m Manager) sync(stripped []byte) error {
 	return nil
 }
 
-func (m Manager) lock() (func(), error) {
+func (m Manager) lock(mode int) (func(), error) {
+	if mode != syscall.LOCK_SH && mode != syscall.LOCK_EX {
+		return nil, errors.New("invalid WireGuard lock mode")
+	}
 	if err := os.MkdirAll(filepath.Dir(m.LockPath), 0700); err != nil {
 		return nil, err
 	}
@@ -634,7 +656,7 @@ func (m Manager) lock() (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
+	if err := syscall.Flock(int(file.Fd()), mode); err != nil {
 		file.Close()
 		return nil, err
 	}

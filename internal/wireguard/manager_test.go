@@ -7,7 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 )
 
 type fakeRunner struct {
@@ -141,6 +143,34 @@ func TestAddListConfigAndDeletePeer(t *testing.T) {
 	}
 	if bytes.Contains(server, []byte(testKey(22))) {
 		t.Fatal("deleted public key remains in server config")
+	}
+}
+
+func TestListWaitsForPeerMutation(t *testing.T) {
+	manager, _ := testManager(t)
+	unlock, err := manager.lock(syscall.LOCK_EX)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := manager.List()
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		unlock()
+		t.Fatalf("peer list did not wait for mutation lock: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+	unlock()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("peer list remained blocked after mutation completed")
 	}
 }
 
