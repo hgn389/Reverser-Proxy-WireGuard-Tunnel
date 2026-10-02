@@ -1,0 +1,176 @@
+{{define "guide.html"}}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>rpctl Configuration Guide</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <div class="brand"><strong>Reverse Proxy &amp; VPN Tunnel</strong></div>
+    <nav>
+      <a href="/">Dashboard</a>
+      <a class="active" href="/guide">Configuration Guide</a>
+    </nav>
+    <div class="header-actions"><a class="github-link" href="https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel" target="_blank" rel="noopener noreferrer">GitHub</a><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="secondary">Sign out</button></form></div>
+  </header>
+  <main class="guide">
+    <section>
+      <h1>Configuration Guide</h1>
+      <p>VPS-1 is the public reverse proxy. VPS-2 through VPS-N run websites or private services. Each server or device that joins WireGuard must use its own peer configuration.</p>
+      <pre>Internet → VPS-1 (rpctl, Nginx, SSL, WireGuard 10.77.0.1)
+                    ↓ encrypted WireGuard tunnel
+          VPS-2 10.77.0.2 · VPS-3 10.77.0.3 · VPS-N</pre>
+      <div class="guide-note"><strong>Keep every client configuration private.</strong> It contains a WireGuard private key. Never reuse one configuration on two devices.</div>
+    </section>
+
+    <section>
+      <h2>Step 1 — Install VPS-1</h2>
+      <p>Use a clean Ubuntu Server 24.04 VPS with a public IPv4 address. Allow SSH, TCP ports 80 and 443, and UDP port 51820 in the provider firewall.</p>
+      <pre><code>sudo apt update
+sudo apt install -y git
+git clone https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel.git rpctl
+cd rpctl
+sudo bash scripts/install.sh</code></pre>
+      <p>Select <strong>WireGuard private mode</strong> and <strong>acme.sh</strong>. The installer creates VPS-1 as <code>10.77.0.1</code> and the first client as <code>10.77.0.2</code>.</p>
+      <pre><code>sudo rpctl status
+sudo rpctl wg peer list
+sudo rp</code></pre>
+      <p>The first client file is:</p>
+      <pre><code>/etc/rpctl/wireguard/peers/client1.conf</code></pre>
+    </section>
+
+    <section>
+      <h2>Step 2 — Copy client1.conf to VPS-2</h2>
+      <p>Copy <code>client1.conf</code> from VPS-1 to <code>/root/client1.conf</code> on VPS-2. You may use SCP, SFTP, or WinSCP. Delete temporary copies after installation.</p>
+      <p>Example with SCP, run from a trusted computer that can reach both servers:</p>
+      <pre><code>scp root@VPS1_PUBLIC_IP:/etc/rpctl/wireguard/peers/client1.conf ./client1.conf
+scp ./client1.conf root@VPS2_IP:/root/client1.conf</code></pre>
+    </section>
+
+    <section>
+      <h2>Step 3 — Install WireGuard on VPS-2 or Orange Pi</h2>
+      <p>Run on VPS-2. Ubuntu, Debian, and Armbian use the same commands:</p>
+      <pre><code>sudo apt update
+sudo apt install -y --no-install-recommends wireguard-tools
+sudo install -d -m 700 /etc/wireguard
+sudo install -m 600 /root/client1.conf /etc/wireguard/wg0.conf
+sudo systemctl enable --now wg-quick@wg0
+sudo rm -f /root/client1.conf</code></pre>
+      <p>Verify the interface and tunnel on VPS-2:</p>
+      <pre><code>ip address show wg0
+sudo wg show
+ping -c 4 10.77.0.1</code></pre>
+      <p>Verify VPS-2 from VPS-1:</p>
+      <pre><code>ping -c 4 10.77.0.2
+sudo wg show</code></pre>
+      <p>A recent handshake and successful pings mean the tunnel is ready.</p>
+    </section>
+
+    <section>
+      <h2>Step 4 — Prepare the Website on VPS-2</h2>
+      <p>Create the website in aaPanel or your web server using its real domain, for example <code>shop.example.com</code>. The web server must listen on <code>10.77.0.2:80</code> or <code>0.0.0.0:80</code>.</p>
+      <p>If UFW is active on VPS-2, allow VPS-1 to reach the website through WireGuard:</p>
+      <pre><code>sudo ufw allow in on wg0 from 10.77.0.1 to any port 80 proto tcp</code></pre>
+      <p>Test the website from VPS-1 before creating the reverse proxy:</p>
+      <pre><code>curl -I -H 'Host: shop.example.com' http://10.77.0.2:80</code></pre>
+      <p>The response should normally be HTTP 200, 301, or 302. Public SSL is installed on VPS-1; the private HTTP hop is already encrypted by WireGuard.</p>
+    </section>
+
+    <section>
+      <h2>Step 5 — Add DNS, Reverse Proxy, and SSL</h2>
+      <ol>
+        <li>Create an A record for <code>shop.example.com</code> pointing to the public IPv4 address of VPS-1.</li>
+        <li>Open Dashboard and enter the domain and complete upstream URL.</li>
+        <li>Use <code>http://10.77.0.2:80</code> as the upstream.</li>
+        <li>After DNS reaches VPS-1, select <strong>Issue SSL</strong>.</li>
+        <li>When Cloudflare is used, select <strong>Full (Strict)</strong> after the VPS-1 certificate is active.</li>
+      </ol>
+      <pre><code>curl -I https://shop.example.com
+sudo rpctl ssl status shop.example.com</code></pre>
+      <p>The SSL timer checks certificates every day and acme.sh renews them before expiration when DNS and port 80 remain reachable.</p>
+    </section>
+
+    <section>
+      <h2>Add VPS-3 Through VPS-N</h2>
+      <h3>1. Create One Peer for the New Server</h3>
+      <p>On VPS-1, use Dashboard → <strong>WireGuard peers</strong> → <strong>Create peer</strong>, terminal menu item 13, or this command:</p>
+      <pre><code>sudo rpctl wg peer add
+sudo rpctl wg peer list</code></pre>
+      <p>The first additional peer is normally <code>client2</code> with <code>10.77.0.3/32</code>. Download it from Dashboard or copy this file:</p>
+      <pre><code>/etc/rpctl/wireguard/peers/client2.conf</code></pre>
+
+      <h3>2. Install It on VPS-3</h3>
+      <p>Copy the file to <code>/root/client2.conf</code> on VPS-3, then run:</p>
+      <pre><code>sudo apt update
+sudo apt install -y --no-install-recommends wireguard-tools
+sudo install -d -m 700 /etc/wireguard
+sudo install -m 600 /root/client2.conf /etc/wireguard/wg0.conf
+sudo systemctl enable --now wg-quick@wg0
+sudo rm -f /root/client2.conf
+ip address show wg0
+sudo wg show
+ping -c 4 10.77.0.1</code></pre>
+
+      <h3>3. Test from VPS-1 and Add the Website</h3>
+      <pre><code>ping -c 4 10.77.0.3
+curl -I -H 'Host: api.example.com' http://10.77.0.3:80</code></pre>
+      <p>Use <code>http://10.77.0.3:80</code> as the upstream. Repeat these steps once per additional server. Deleted addresses may be reused, so always check <code>rpctl wg peer list</code> instead of guessing an address.</p>
+      <div class="example-grid">
+        <div><strong>VPS-2 · client1</strong><code>10.77.0.2</code></div>
+        <div><strong>VPS-3 · client2</strong><code>10.77.0.3</code></div>
+        <div><strong>VPS-4 · client3</strong><code>10.77.0.4</code></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Connect a Windows Computer</h2>
+      <ol>
+        <li>Install the official WireGuard client from <a href="https://www.wireguard.com/install/" target="_blank" rel="noopener noreferrer">wireguard.com/install</a>.</li>
+        <li>Create a dedicated peer on VPS-1, for example <code>sudo rpctl wg peer add windows-laptop</code>.</li>
+        <li>Download <code>windows-laptop.conf</code> from Dashboard.</li>
+        <li>Open WireGuard on Windows and select <strong>Import tunnel(s) from file</strong>.</li>
+        <li>Select the downloaded file and activate the tunnel.</li>
+        <li>Open PowerShell and run <code>ping 10.77.0.1</code>.</li>
+      </ol>
+      <p>On VPS-1, run <code>sudo wg show</code> and confirm that the Windows peer has a recent handshake.</p>
+    </section>
+
+    <section>
+      <h2>Connect an iPhone, iPad, or Android Device</h2>
+      <ol>
+        <li>Install the official WireGuard app from the Apple App Store or Google Play through <a href="https://www.wireguard.com/install/" target="_blank" rel="noopener noreferrer">wireguard.com/install</a>.</li>
+        <li>Create a separate peer for each device, such as <code>iphone-nam</code> or <code>android-phone</code>.</li>
+        <li>Download that device's <code>.conf</code> file from Dashboard using the device itself, or transfer it securely with AirDrop, Files, USB, or another private method.</li>
+        <li>In the WireGuard app, add a tunnel by importing the file.</li>
+        <li>Activate the tunnel, then check <code>sudo wg show</code> on VPS-1 for a recent handshake.</li>
+        <li>Open a known private website or service through its <code>10.77.0.x</code> address to test access.</li>
+      </ol>
+      <p>Delete the downloaded configuration after importing it. A phone, tablet, and computer must never share the same peer configuration.</p>
+      <p>Private mode routes only <code>10.77.0.0/24</code> through WireGuard, so normal Internet traffic continues to use the device's regular connection.</p>
+    </section>
+
+    <section>
+      <h2>Common Problems</h2>
+      <ul>
+        <li><strong>No handshake:</strong> allow UDP 51820 on the VPS provider firewall and confirm that the client endpoint uses the public IP of VPS-1.</li>
+        <li><strong>Ping works but the website does not:</strong> check the origin web server, its listening address, port, UFW rule, and domain virtual host.</li>
+        <li><strong>502 Bad Gateway:</strong> VPS-1 cannot reach the configured upstream.</li>
+        <li><strong>522 Connection timed out:</strong> Cloudflare cannot reach TCP ports 80 or 443 on VPS-1.</li>
+        <li><strong>SSL cannot renew:</strong> keep DNS pointed to VPS-1 and public port 80 reachable for the HTTP-01 challenge.</li>
+        <li><strong>Web Panel login blocked:</strong> use menu item 11 in <code>sudo rp</code> to unblock the client IP.</li>
+      </ul>
+      <pre><code>sudo rpctl status
+sudo rpctl system nginx-test
+sudo rpctl ssl status
+sudo rpctl wg peer list
+sudo wg show</code></pre>
+    </section>
+  </main>
+  <footer><strong>rpctl v{{.Version}}</strong><span aria-hidden="true">&copy;</span><span>by <a href="https://hoanggiangnam.com" target="_blank" rel="noopener noreferrer">Nam Hoàng</a></span></footer>
+</body>
+</html>
+{{end}}
