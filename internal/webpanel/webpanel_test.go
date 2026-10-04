@@ -21,6 +21,7 @@ import (
 
 	"rpctl/internal/certmgr"
 	"rpctl/internal/proxy"
+	"rpctl/internal/tailscale"
 	"rpctl/internal/wireguard"
 	webassets "rpctl/web"
 )
@@ -553,6 +554,48 @@ func TestDashboardSSLControlsAndResponsiveAssets(t *testing.T) {
 	}
 	if !strings.Contains(string(favicon), "#d1242f") || !strings.Contains(string(favicon), "aria-label=\"Red lock\"") {
 		t.Fatal("red lock favicon is missing its expected shape or color")
+	}
+}
+
+func TestDashboardTailscaleModeAndUpdateNotification(t *testing.T) {
+	server, err := NewServer(testConfig(t), "test", testStore(t), &recordingClient{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rendered bytes.Buffer
+	err = server.templates.ExecuteTemplate(&rendered, "dashboard.html", dashboardData{
+		Version: "test",
+		CSRF:    "session-token",
+		VPNMode: "tailscale",
+		Tailscale: tailscale.Status{
+			BackendState: "Running",
+			Tailnet:      "example.com",
+			Self:         tailscale.Device{Name: "vps-1", IPs: []string{"100.64.0.1"}, Online: true},
+			Peers:        []tailscale.Device{{Name: "iphone", DNSName: "iphone.example.ts.net", IPs: []string{"100.64.0.2"}, OS: "iOS", Online: true}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := rendered.String()
+	for _, expected := range []string{"Tailscale network", "example.com", "100.64.0.1", "iphone", "100.64.0.2", "Open Admin Console", "update-banner", "Update now!"} {
+		if !strings.Contains(html, expected) {
+			t.Errorf("Tailscale dashboard is missing %q", expected)
+		}
+	}
+	for _, unexpected := range []string{"WireGuard peers - Add a device", "/wireguard/peer/add", "wireguard-qr-dialog"} {
+		if strings.Contains(html, unexpected) {
+			t.Errorf("Tailscale dashboard contains WireGuard control %q", unexpected)
+		}
+	}
+	javascript, err := fs.ReadFile(webassets.Files, "static/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"/system/update-status", "60 * 60 * 1000", "sessionStorage", "checked_at"} {
+		if !strings.Contains(string(javascript), expected) {
+			t.Errorf("update notification script is missing %q", expected)
+		}
 	}
 }
 

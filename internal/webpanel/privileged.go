@@ -15,6 +15,7 @@ import (
 
 	"rpctl/internal/certmgr"
 	"rpctl/internal/proxy"
+	"rpctl/internal/tailscale"
 	"rpctl/internal/updater"
 	"rpctl/internal/wireguard"
 )
@@ -58,7 +59,7 @@ func (r PrivilegedRequest) Validate() error {
 			return errors.New("upstream is not allowed for this operation")
 		}
 		return proxy.ValidateDomain(r.Domain)
-	case "nginx_test", "system_restart_nginx", "system_reboot", "system_update", "ssl_status_all":
+	case "nginx_test", "system_restart_nginx", "system_reboot", "system_update", "ssl_status_all", "tailscale_status":
 		if r.Domain != "" || r.Upstream != "" || r.Peer != "" {
 			return fmt.Errorf("%s does not accept arguments", r.Operation)
 		}
@@ -247,6 +248,14 @@ func servePrivilegedOnce(reader io.Reader, writer io.Writer, store proxy.Store, 
 				if result.Warning != "" {
 					responseData += " WARNING: " + result.Warning
 				}
+			}
+		case "tailscale_status":
+			var status tailscale.Status
+			status, operationErr = tailscale.DefaultManager().Status(context.Background())
+			if operationErr == nil {
+				var encoded []byte
+				encoded, operationErr = json.Marshal(status)
+				responseData = string(encoded)
 			}
 		case "wg_peer_list":
 			var peers []wireguard.Peer

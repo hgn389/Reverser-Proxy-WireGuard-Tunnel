@@ -60,6 +60,32 @@ func TestInstallerOffersValidatedWireGuardSubnetSelection(t *testing.T) {
 	}
 }
 
+func TestInstallerOffersTailscaleBackend(t *testing.T) {
+	installerPath := filepath.Join("..", "..", "scripts", "install.sh")
+	content, err := os.ReadFile(installerPath)
+	if err != nil {
+		t.Fatalf("read installer: %v", err)
+	}
+	installer := string(content)
+	for _, expected := range []string{
+		"Select VPN backend:",
+		"1) WireGuard (default)",
+		"2) Tailscale",
+		"3) No VPN",
+		"--tailscale",
+		"--no-vpn",
+		"RPCTL_TS_AUTH_KEY_FILE",
+		"--auth-key=\"file:${tailscale_auth_key_file}\"",
+		"pkgs.tailscale.com/stable/ubuntu/${VERSION_CODENAME}.noarmor.gpg",
+		"pkgs.tailscale.com/stable/ubuntu/${VERSION_CODENAME}.tailscale-keyring.list",
+		"write_vpn_mode \"$vpn_backend\"",
+	} {
+		if !strings.Contains(installer, expected) {
+			t.Errorf("installer is missing Tailscale behavior %q", expected)
+		}
+	}
+}
+
 func TestInstallerWireGuardSubnetHelpers(t *testing.T) {
 	installerPath := filepath.Join("..", "..", "scripts", "install.sh")
 	content, err := os.ReadFile(installerPath)

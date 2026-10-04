@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -33,6 +34,13 @@ type Result struct {
 	Current  string
 	Updated  bool
 	Warning  string
+}
+
+type Status struct {
+	Current   string    `json:"current"`
+	Latest    string    `json:"latest"`
+	Available bool      `json:"available"`
+	CheckedAt time.Time `json:"checked_at"`
 }
 
 type Manager struct {
@@ -212,6 +220,65 @@ func (m Manager) UpdateLatest(ctx context.Context) (Result, error) {
 	return result, nil
 }
 
+// CheckLatest reads the latest release metadata without downloading the binary.
+func (m Manager) CheckLatest(ctx context.Context, current string) (Status, error) {
+	if m.Repository == "" {
+		m.Repository = defaultRepository
+	}
+	if m.Client == nil {
+		m.Client = DefaultManager().Client
+	}
+	if err := validateRepository(m.Repository); err != nil {
+		return Status{}, err
+	}
+	current = normalizeVersion(current)
+	if _, err := parseVersion(current); err != nil {
+		return Status{}, err
+	}
+	asset, err := releaseAssetName()
+	if err != nil {
+		return Status{}, err
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://github.com/"+m.Repository+"/releases/latest", nil)
+	if err != nil {
+		return Status{}, err
+	}
+	request.Header.Set("User-Agent", "rpctl-update-check")
+	redirectClient := *m.Client
+	redirectClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	response, err := redirectClient.Do(request)
+	if err != nil {
+		return Status{}, err
+	}
+	response.Body.Close()
+	if response.StatusCode != http.StatusFound && response.StatusCode != http.StatusMovedPermanently && response.StatusCode != http.StatusTemporaryRedirect && response.StatusCode != http.StatusPermanentRedirect {
+		return Status{}, fmt.Errorf("GitHub returned HTTP %d", response.StatusCode)
+	}
+	latest, err := releaseVersionFromRedirect(m.Repository, response.Header.Get("Location"))
+	if err != nil {
+		return Status{}, err
+	}
+	data, err := m.download(ctx, "https://github.com/"+m.Repository+"/releases/download/"+latest+"/SHA256SUMS", maxChecksumSize)
+	if err != nil {
+		return Status{}, fmt.Errorf("downloading release checksums: %w", err)
+	}
+	if _, err := checksumForAsset(data, asset); err != nil {
+		return Status{}, err
+	}
+	comparison, err := compareVersions(latest, current)
+	if err != nil {
+		return Status{}, err
+	}
+	return Status{
+		Current:   current,
+		Latest:    latest,
+		Available: comparison > 0,
+		CheckedAt: time.Now().UTC(),
+	}, nil
+}
+
 func (m Manager) download(ctx context.Context, rawURL string, limit int64) ([]byte, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
@@ -358,6 +425,33 @@ func parseVersion(value string) ([3]int, error) {
 		parsed[index] = number
 	}
 	return parsed, nil
+}
+
+func normalizeVersion(value string) string {
+	value = strings.TrimSpace(value)
+	if value != "" && !strings.HasPrefix(value, "v") {
+		return "v" + value
+	}
+	return value
+}
+
+func releaseVersionFromRedirect(repository, location string) (string, error) {
+	parsed, err := url.Parse(location)
+	if err != nil || (parsed.IsAbs() && (parsed.Scheme != "https" || !strings.EqualFold(parsed.Hostname(), "github.com"))) {
+		return "", errors.New("GitHub latest release redirect was malformed")
+	}
+	prefix := "/" + repository + "/releases/tag/"
+	if !strings.HasPrefix(parsed.Path, prefix) {
+		return "", errors.New("GitHub latest release redirect was malformed")
+	}
+	version := strings.TrimPrefix(parsed.Path, prefix)
+	if version == "" || strings.Contains(version, "/") || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", errors.New("GitHub latest release redirect was malformed")
+	}
+	if _, err := parseVersion(version); err != nil {
+		return "", err
+	}
+	return version, nil
 }
 
 func lockUpdate(path string) (func(), error) {

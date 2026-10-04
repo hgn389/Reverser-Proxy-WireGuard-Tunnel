@@ -32,6 +32,31 @@ func TestVersionComparison(t *testing.T) {
 	}
 }
 
+func TestLatestReleaseRedirect(t *testing.T) {
+	for _, location := range []string{
+		"/hgn389/Reverser-Proxy-WireGuard-Tunnel/releases/tag/v1.0.7",
+		"https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel/releases/tag/v1.0.7",
+	} {
+		version, err := releaseVersionFromRedirect("hgn389/Reverser-Proxy-WireGuard-Tunnel", location)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if version != "v1.0.7" {
+			t.Fatalf("version=%q, want v1.0.7", version)
+		}
+	}
+	for _, location := range []string{
+		"https://example.com/hgn389/Reverser-Proxy-WireGuard-Tunnel/releases/tag/v1.0.7",
+		"https://github.com/other/repo/releases/tag/v1.0.7",
+		"https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel/releases/tag/latest",
+		"https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel/releases/tag/v1.0.7/extra",
+	} {
+		if _, err := releaseVersionFromRedirect("hgn389/Reverser-Proxy-WireGuard-Tunnel", location); err == nil {
+			t.Errorf("invalid redirect %q was accepted", location)
+		}
+	}
+}
+
 func TestChecksumForAsset(t *testing.T) {
 	digest := "b37d6e3e48f12f5f88aa987d5f57c252a94d9c99eab8ceba0e27bfd8e4ee7751"
 	data := []byte(digest + "  rpctl-linux-amd64\n" + digest + " *rpctl-linux-arm64\n")

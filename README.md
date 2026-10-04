@@ -4,7 +4,7 @@
 
 ### 1. VPS-1 — Reverse Proxy
 
-This v1.0.6 installer supports **Ubuntu Server 22.04 LTS and 24.04 LTS** on `amd64` and `arm64`. Run this command on a clean VPS:
+This v1.0.7 installer supports **Ubuntu Server 22.04 LTS and 24.04 LTS** on `amd64` and `arm64`. Run this command on a clean VPS:
 
 ```bash
 sudo apt update && sudo apt install -y ca-certificates curl git && git clone https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel.git rpctl && cd rpctl && sudo bash scripts/install.sh
@@ -19,9 +19,19 @@ grep -n 'ubuntu:22.04' scripts/install.sh
 sudo bash scripts/install.sh
 ```
 
-The `grep` command must show `ubuntu:22.04|ubuntu:24.04`. The installer then downloads the latest GitHub Release, so the repository owner must publish the v1.0.6 release assets before this installation is used.
+The `grep` command must show `ubuntu:22.04|ubuntu:24.04`. The installer then downloads the latest GitHub Release, so the repository owner must publish the v1.0.7 release assets before this installation is used.
 
-Select **WireGuard private mode** in the installer. The interactive installer then offers:
+The installer first asks for a VPN backend:
+
+```text
+Select VPN backend:
+  1) WireGuard (default)
+  2) Tailscale
+  3) No VPN
+Select [1]:
+```
+
+Select **WireGuard**, then **WireGuard private mode**, for the configuration below. The interactive installer then offers:
 
 ```text
 WireGuard subnet:
@@ -96,6 +106,28 @@ sudo rp
 ```
 
 **Done.**
+
+## Tailscale Quick Start
+
+Select **Tailscale** in the installer to install the official stable Tailscale package instead of configuring WireGuard. The installer starts `tailscaled` and displays a secure login URL. Complete the login to add VPS-1 to your tailnet.
+
+Install Tailscale on every upstream server and sign in to the same tailnet. Retrieve each server's address with:
+
+```bash
+tailscale ip -4
+tailscale status
+```
+
+Test the upstream from VPS-1 before adding a proxy:
+
+```bash
+ping -c 4 100.101.102.103
+curl -I -H 'Host: shop.example.com' http://100.101.102.103:80
+```
+
+Use the real Tailscale address or MagicDNS name as the upstream. The Web Panel displays the local Tailscale identity, tailnet, addresses, and other devices. Device approval and tailnet grants or ACLs remain managed in the [Tailscale Admin Console](https://login.tailscale.com/admin/machines).
+
+On iPhone, iPad, Android, Windows, or macOS, install the official Tailscale application and sign in to the same tailnet. Tailscale does not use rpctl WireGuard `.conf` files or QR codes.
 
 ## Add VPS-3 Through VPS-N
 
@@ -220,14 +252,15 @@ rpctl is a small Nginx reverse proxy and VPN management tool. One static Go bina
 - Manage multiple reverse proxy domains with independent HTTP or HTTPS upstreams.
 - Test Nginx and roll back failed configuration changes.
 - Issue and renew Let's Encrypt certificates through the optional acme.sh component.
+- Select WireGuard, Tailscale, or no VPN during installation.
 - Bootstrap a WireGuard server and one initial client configuration.
 - Create, list, inspect, download, and delete additional WireGuard peers.
-- Detect WireGuard and Tailscale interface addresses.
+- Install Tailscale from its official stable APT repository and display tailnet device status.
 - Optionally run a lightweight authenticated Web Panel.
 - Install a newer checksum-verified GitHub Release from the CLI, terminal menu, or Web Panel.
 - Run without Docker, a database, PHP, Node.js or a background CLI process.
 
-The default minimal installation contains Nginx and the rpctl binary. The Web Panel, WireGuard and acme.sh are optional. Portable backup/restore commands are not implemented yet.
+The default interactive VPN selection is WireGuard. The Web Panel, VPN backend and acme.sh remain optional. Portable backup/restore commands are not implemented yet.
 
 ## Install on a clean Ubuntu 22.04 or 24.04 VPS
 
@@ -259,7 +292,7 @@ The installer reads interactive answers from `/dev/tty`, so the one-line command
 
 | Prompt | Choose it when |
 |---|---|
-| WireGuard tools | The reverse proxy needs a private VPN path to another server |
+| VPN backend | Choose WireGuard, Tailscale, or no VPN; WireGuard is the default |
 | WireGuard private mode | Only the selected private WireGuard subnet should use the tunnel |
 | WireGuard full-tunnel mode | All client Internet traffic should pass through VPS-1 |
 | acme.sh | You need HTTPS certificates and automatic renewal; choose it when using a Web Panel domain |
@@ -276,7 +309,7 @@ sudo rp
 
 The SSH login banner also displays the server IP, VPN IP, Web Panel address and the `rp` menu command.
 
-When the Web Panel is selected, the final bordered block shows its domain, direct IP address, username, the password entered during interactive setup, WireGuard client path, and terminal menu command. Save this information privately. Direct `http://IP:9080` access is enabled initially so the panel remains reachable while DNS or SSL is being prepared. Disable it later with menu item 12 when only domain access is desired.
+When the Web Panel is selected, the final bordered block shows its domain, direct IP address, username, the password entered during interactive setup, selected VPN details, and terminal menu command. Save this information privately. Direct `http://IP:9080` access is enabled initially so the panel remains reachable while DNS or SSL is being prepared. Disable it later with menu item 12 when only domain access is desired.
 
 For a noninteractive installation, download `install.sh` first and select every component explicitly:
 
@@ -284,7 +317,8 @@ For a noninteractive installation, download `install.sh` first and select every 
 sudo bash install.sh --wireguard-private --acme --no-web --open-firewall
 sudo bash install.sh --wireguard-full --acme --no-web --open-firewall
 sudo bash install.sh --wireguard --no-acme --no-web --no-firewall
-sudo bash install.sh --no-wireguard --no-acme --no-web --no-firewall
+sudo bash install.sh --tailscale --acme --web --open-firewall
+sudo bash install.sh --no-vpn --no-acme --no-web --no-firewall
 ```
 
 To select a custom subnet noninteractively, set only `RPCTL_WG_NETWORK`; the installer derives the server and initial peer addresses:
@@ -295,6 +329,19 @@ sudo env RPCTL_WG_NETWORK=10.79.0.0/24 \
 ```
 
 `--wireguard` installs the tools without creating an interface. `--acme` installs a pinned, checksum-verified acme.sh release and its renewal timer; `--no-acme` skips that component on a clean installation. Rerunning the installer preserves an existing rpctl-managed acme.sh installation and timer. `--web` installs the Web Panel. Direct `IP:9080` access is enabled after a new Web Panel installation so the panel is immediately reachable. When a panel domain is entered, rpctl also checks its HTTP route and issues its HTTPS certificate automatically when DNS is ready. `--no-web` keeps the CLI-only installation. A skipped component can be added later. The GitHub Release binary is verified against `SHA256SUMS` before installation. The VPS does not need Go.
+
+`--tailscale` installs Tailscale from its official stable Ubuntu repository and connects the VPS. For an unattended installation, use a one-off or appropriately tagged auth key stored in a root-owned file with permissions `0600` or stricter:
+
+```bash
+sudo install -m 600 /dev/null /root/tailscale-auth-key
+sudo sh -c 'cat > /root/tailscale-auth-key'
+# Paste the key, then press Ctrl+D.
+sudo env RPCTL_TS_AUTH_KEY_FILE=/root/tailscale-auth-key \
+  bash install.sh --tailscale --acme --no-web --open-firewall
+sudo rm -f /root/tailscale-auth-key
+```
+
+The installer passes the file path directly to `tailscale up --auth-key=file:...`; it does not copy the key into rpctl configuration or logs. Existing installations are detected through `/etc/rpctl/vpn-mode` and legacy VPN configuration. The installer preserves the selected backend and refuses to switch an active WireGuard or Tailscale installation automatically.
 
 An interactive `--web` installation asks for the panel domain, admin username, and password through `/dev/tty`. For unattended installation, keep the password out of command arguments and environment variables by using a protected file:
 
@@ -307,7 +354,7 @@ sudo env \
   RPCTL_WEB_DOMAIN=panel.example.com \
   RPCTL_WEB_USERNAME=admin \
   RPCTL_WEB_PASSWORD_FILE=/root/rpctl-web-password \
-  bash install.sh --no-wireguard --acme --web --open-firewall
+  bash install.sh --no-vpn --acme --web --open-firewall
 sudo rm -f /root/rpctl-web-password
 ```
 
@@ -601,6 +648,7 @@ sudo rpctl wg peer add
 sudo rpctl wg peer add home-server
 sudo rpctl wg peer show home-server
 sudo rpctl wg peer delete home-server
+sudo rpctl tailscale status
 ```
 
 The `rp` menu and `rpctl status` show the server interface addresses and detected WireGuard/Tailscale addresses. The menu redraws a bordered header after each operation so previous output remains visually separated from the next choices. Menu option `2. List proxy domains` shows every managed domain, and option `9. SSL certificates` opens certificate actions.
@@ -616,7 +664,8 @@ The `rp` menu and `rpctl status` show the server interface addresses and detecte
 | 10 | Install the optional Web Panel later |
 | 11 | Inspect and unblock Web Panel login IPs |
 | 12 | Enable or disable direct Web Panel IP:port access |
-| 13 | List, create, inspect or delete WireGuard peers |
+| 13 | Manage WireGuard peers or show Tailscale status, according to the selected backend |
+| 14 | Install the latest verified GitHub release |
 
 ## Optional Web Panel
 
@@ -656,7 +705,11 @@ sudo rpctl web public-access disable
 
 When UFW is active, rpctl adds port `9080/tcp` only while direct access is enabled and removes only the rule marked as managed by rpctl. A domain and IP:port can remain active together. The Dashboard shows the direct URL beside **Webpanel Dashboard** while it is enabled.
 
-The panel provides the VPS and WireGuard/Tailscale addresses, CPU, RAM, swap, SSD and uptime summaries, managed proxy CRUD, WireGuard peer creation/deletion, client configuration downloads and QR codes, per-domain SSL issue/renew buttons, certificate expiration days, checksum-verified rpctl updates, controlled Nginx restart and VPS reboot actions, and an authenticated **Configuration Guide** page for VPS-1/VPS-2/VPS-N and desktop/mobile WireGuard clients. The Add proxy section includes an example route and explains the domain, upstream address, connectivity requirement, and next SSL step. The guide is available at `/guide`. The header includes the project GitHub link beside Sign out. The footer reads the running version directly from the compiled binary, so every correctly built update displays its own version automatically. The layout expands on desktop and changes tables into mobile cards on narrow screens. Its red-lock favicon, HTML, CSS, and JavaScript are embedded in the same binary. It does not install Node.js, PHP, a database, or another binary.
+The panel provides the VPS and VPN addresses, CPU, RAM, swap, SSD and uptime summaries, managed proxy CRUD, per-domain SSL controls, controlled Nginx restart and VPS reboot actions, and an authenticated **Configuration Guide**. In WireGuard mode it provides peer creation/deletion, configuration downloads and QR codes. In Tailscale mode it displays the local identity, tailnet and device status returned by `tailscale status --json`, with a link to the Tailscale Admin Console for device approval and policy management.
+
+The Web Panel checks the latest GitHub Release when it starts and every 60 minutes. When a newer version is available, a dismissible notification appears at the top of the Dashboard with an **Update now!** action. Dismissing it hides the notification for the current login session; a new login or the next hourly check can display it again. The previous permanent update button is removed. Updates continue to verify `SHA256SUMS` before replacing the binary.
+
+The Add proxy section changes its examples to match the selected VPN backend and explains the domain, upstream address, connectivity requirement, and next SSL step. The guide is available at `/guide` and displays either WireGuard or Tailscale instructions. The header includes the project GitHub link beside Sign out. The footer reads the running version directly from the compiled binary. The layout expands on desktop and changes tables into mobile cards on narrow screens. Its red-lock favicon, HTML, CSS, and JavaScript are embedded in the same binary. It does not install Node.js, PHP, a database, or another binary.
 
 With IP:port access disabled, the service binds only to `127.0.0.1:9080` and Nginx is the public HTTPS entry point. Domain sessions use Secure, HttpOnly, SameSite Strict cookies. Direct `http://IP:9080` sessions use separate HttpOnly, SameSite Strict cookies because browsers cannot send Secure cookies over HTTP. Use direct HTTP as a temporary recovery path on a trusted network; it does not encrypt credentials or session traffic. State-changing forms require CSRF tokens. Password checks are serialized to protect a small CPU from parallel bcrypt requests, and the response never reveals whether the username or password was wrong.
 
@@ -692,6 +745,29 @@ rpctl ssl status app.example.com
 `ssl issue` prepares a dedicated `/.well-known/acme-challenge/` location on the VPS, requests an ECDSA certificate from Let's Encrypt, validates the certificate and private key, and only then enables port 443. HTTP redirects to HTTPS after successful activation. The upstream may remain HTTP when it travels through a private WireGuard link.
 
 Certificates are stored under `/etc/rpctl/certs/DOMAIN/`; private keys and ACME account data are mode `0600`/`0700`. `rpctl-ssl-renew.timer` runs every day with a randomized delay. It asks acme.sh to renew every enabled certificate; acme.sh renews certificates when they enter the renewal window, before expiration. rpctl validates the renewed certificate and key and reloads Nginx only after a valid pair is installed. DNS and public port 80 must remain available for HTTP-01 renewal. UFW installations opened by the installer allow both `80/tcp` and `443/tcp`.
+
+## Tailscale backend
+
+Tailscale mode installs `tailscale` and `tailscaled` from the official stable APT repository for the detected Ubuntu release. It does not ask for a private subnet because Tailscale assigns tailnet addresses automatically. No inbound provider firewall port is required for the normal Tailscale client connection.
+
+Check the selected backend and current Tailscale devices with:
+
+```bash
+rpctl status
+sudo rpctl tailscale status
+tailscale ip -4
+```
+
+The Web Panel's **Tailscale network** section is read-only. It shows the backend state, tailnet, local device, addresses, operating systems and online state of known peers. Approve, rename or remove devices and configure grants or ACLs in the Tailscale Admin Console. rpctl does not store Tailscale API or OAuth credentials.
+
+To add an upstream server, install Tailscale on that server, sign in to the same tailnet, approve it when required, and permit VPS-1 to reach the application's port. Test the address from VPS-1 before creating a reverse proxy:
+
+```bash
+curl -I -H 'Host: app.example.com' http://100.101.102.103:80
+sudo rpctl proxy add app.example.com --upstream http://100.101.102.103:80
+```
+
+Tailscale clients can also use MagicDNS names in upstream URLs when name resolution is enabled and working on VPS-1. Each computer or mobile device joins through the official Tailscale application and the tailnet login flow. WireGuard configuration downloads and QR codes remain available only in WireGuard mode.
 
 ## WireGuard bootstrap
 
@@ -761,9 +837,9 @@ From v1.0.3 onward, install the latest published GitHub Release with either meth
 sudo rpctl update
 ```
 
-The same action is available as `14. Update to latest version` in the terminal menu and as **Update rpctl** in the Web Panel's System section. rpctl downloads the binary for the current architecture, verifies it against the release `SHA256SUMS`, rejects downgrades, saves the previous binary as `/usr/local/bin/rpctl.previous`, refreshes installed Web Panel units, and restarts the panel after returning the update result.
+The same action is available as `14. Update to latest version` in the terminal menu. The Web Panel checks for a release on startup and every 60 minutes, then displays **Update now!** only when a newer version exists. rpctl downloads the binary for the current architecture, verifies it against the release `SHA256SUMS`, rejects downgrades, saves the previous binary as `/usr/local/bin/rpctl.previous`, refreshes installed Web Panel units, and restarts the panel after returning the update result.
 
-An rpctl update preserves existing Nginx, Web Panel, certificate, and WireGuard configuration. The `10.10.10.0/24` default and interactive subnet selection apply only when WireGuard is configured for the first time; updating does not rewrite an existing WireGuard subnet or peer configuration.
+An rpctl update preserves existing Nginx, Web Panel, certificate, WireGuard and Tailscale configuration. Installations created before the VPN selector are detected from the existing WireGuard or Tailscale state. The `10.10.10.0/24` default and interactive subnet selection apply only when WireGuard is configured for the first time; updating does not rewrite an existing WireGuard subnet or peer configuration.
 
 The reviewed installer remains available as a recovery or manual upgrade path:
 
@@ -815,6 +891,7 @@ sudo rpctl system nginx-test
 systemctl status nginx rpctl-web.service rpctl-web-helper.socket
 journalctl -u nginx -u rpctl-web.service --since today
 sudo wg show
+tailscale status
 ```
 
 ## Current limitations
@@ -822,7 +899,7 @@ sudo wg show
 - The installer supports Ubuntu Server 22.04 LTS and 24.04 LTS for the rpctl server.
 - SSL v1 uses Let's Encrypt HTTP-01; DNS-01 is not implemented.
 - Automatic peer allocation currently supports IPv4 WireGuard subnets from `/16` through `/30`.
-- Tailscale addresses are detected, but rpctl does not install or administer Tailscale yet.
+- Tailscale device approval, removal, grants and ACLs are managed in the Tailscale Admin Console; the rpctl Web Panel displays status only.
 - Portable backup/restore commands are not implemented yet.
 - Direct Web Panel access at `http://IP:9080` is unencrypted and should be used only as a temporary recovery path.
 

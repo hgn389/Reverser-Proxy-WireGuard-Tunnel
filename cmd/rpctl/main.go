@@ -25,7 +25,9 @@ import (
 
 	"rpctl/internal/certmgr"
 	"rpctl/internal/proxy"
+	"rpctl/internal/tailscale"
 	"rpctl/internal/updater"
+	"rpctl/internal/vpnmode"
 	"rpctl/internal/webpanel"
 	"rpctl/internal/wireguard"
 )
@@ -86,6 +88,7 @@ func help() {
   rpctl wg peer add [NAME]
   rpctl wg peer show NAME
   rpctl wg peer delete NAME
+  rpctl tailscale status
   rpctl update
   rpctl version
 
@@ -125,6 +128,7 @@ func run(s proxy.Store, args []string) error {
 		fmt.Println("rpctl", version)
 		fmt.Println("Server IP:", serverIPs)
 		fmt.Println("VPN IP:", vpnIPs)
+		fmt.Println("VPN backend:", vpnmode.Detect())
 		fmt.Printf("Managed sites: %d\n", len(sites))
 		if _, err := os.Stat(nginxPath); err != nil {
 			fmt.Println("Nginx: not installed")
@@ -218,6 +222,8 @@ func run(s proxy.Store, args []string) error {
 		return errors.New("usage: rpctl system nginx-test|reload|recover")
 	case "wg":
 		return wgCommand(args[1:])
+	case "tailscale":
+		return tailscaleCommand(args[1:])
 	case "update":
 		if len(args) != 1 {
 			return errors.New("usage: rpctl update")
@@ -241,6 +247,29 @@ func run(s proxy.Store, args []string) error {
 	default:
 		return fmt.Errorf("unknown command %q; run rpctl help", args[0])
 	}
+}
+
+func tailscaleCommand(args []string) error {
+	if len(args) != 1 || args[0] != "status" {
+		return errors.New("usage: rpctl tailscale status")
+	}
+	status, err := tailscale.DefaultManager().Status(context.Background())
+	if err != nil {
+		return err
+	}
+	fmt.Println("Tailscale:", status.BackendState)
+	if status.Tailnet != "" {
+		fmt.Println("Tailnet:", status.Tailnet)
+	}
+	fmt.Printf("This device: %s (%s)\n", status.Self.Name, strings.Join(status.Self.IPs, ", "))
+	for _, peer := range status.Peers {
+		state := "offline"
+		if peer.Online {
+			state = "online"
+		}
+		fmt.Printf("%-32s %-39s %s\n", peer.Name, strings.Join(peer.IPs, ", "), state)
+	}
+	return nil
 }
 
 func wgCommand(args []string) error {
@@ -821,12 +850,19 @@ func menu(s proxy.Store) error {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		serverIPs, vpnIPs := networkSummary()
+		vpnMode := vpnmode.Detect()
+		vpnMenuLabel := "VPN status"
+		if vpnMode == vpnmode.WireGuard {
+			vpnMenuLabel = "WireGuard peers"
+		} else if vpnMode == vpnmode.Tailscale {
+			vpnMenuLabel = "Tailscale status"
+		}
 		fmt.Print("\n------------------------------------------------------------\n")
 		fmt.Println("# rpctl", version)
 		fmt.Println("# Server IP:", serverIPs)
 		fmt.Println("# VPN IP:   ", vpnIPs)
 		fmt.Print("------------------------------------------------------------\n")
-		fmt.Print("1. Status\n2. List proxy domains\n3. Add proxy\n4. Edit proxy\n5. Enable proxy\n6. Disable proxy\n7. Delete proxy\n8. Test Nginx\n9. SSL certificates\n10. Install Webpanel Reverse Proxy\n11. Unblock Webpanel IP\n12. On-OFF Webpanel via IP:port\n13. WireGuard peers\n14. Update to latest version\n0. Exit\n")
+		fmt.Printf("1. Status\n2. List proxy domains\n3. Add proxy\n4. Edit proxy\n5. Enable proxy\n6. Disable proxy\n7. Delete proxy\n8. Test Nginx\n9. SSL certificates\n10. Install Webpanel Reverse Proxy\n11. Unblock Webpanel IP\n12. On-OFF Webpanel via IP:port\n13. %s\n14. Update to latest version\n0. Exit\n", vpnMenuLabel)
 		fmt.Print("############################################################\nChoice: ")
 		choice, err := reader.ReadString('\n')
 		if err != nil {
@@ -901,8 +937,17 @@ func menu(s proxy.Store) error {
 			printMenuGap()
 			continue
 		case "13":
-			if err := wireGuardPeerMenu(reader); err != nil {
-				fmt.Fprintln(os.Stderr, "ERROR:", err)
+			var vpnErr error
+			switch vpnMode {
+			case vpnmode.WireGuard:
+				vpnErr = wireGuardPeerMenu(reader)
+			case vpnmode.Tailscale:
+				vpnErr = tailscaleCommand([]string{"status"})
+			default:
+				vpnErr = errors.New("no VPN backend is configured")
+			}
+			if vpnErr != nil {
+				fmt.Fprintln(os.Stderr, "ERROR:", vpnErr)
 			}
 			printMenuGap()
 			continue

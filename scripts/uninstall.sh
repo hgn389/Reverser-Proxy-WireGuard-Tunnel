@@ -43,6 +43,10 @@ fi
 rm -f -- /etc/systemd/system/rpctl-web.service /etc/systemd/system/rpctl-web-helper.socket /etc/systemd/system/rpctl-web-helper@.service
 rm -rf -- /etc/rpctl/web
 rm -rf -- /var/lib/rpctl/web
+if [[ -f /etc/rpctl/vpn-mode && ! -L /etc/rpctl/vpn-mode ]] && \
+   [[ $(tr -d '[:space:]' < /etc/rpctl/vpn-mode) =~ ^(wireguard|tailscale|none)$ ]]; then
+  rm -- /etc/rpctl/vpn-mode
+fi
 rm -f -- /run/rpctl/web-helper.sock
 rm -f -- /run/rpctl/update.lock
 if [[ -f /etc/update-motd.d/99-rpctl && ! -L /etc/update-motd.d/99-rpctl ]] && \
@@ -56,4 +60,4 @@ fi
 if /usr/bin/getent group rpweb >/dev/null 2>&1; then
   /usr/sbin/groupdel rpweb
 fi
-printf 'rpctl uninstalled. Nginx, WireGuard, certificates, acme.sh account data, and rollback copies were kept.\n'
+printf 'rpctl uninstalled. Nginx, WireGuard, Tailscale, certificates, acme.sh account data, and rollback copies were kept.\n'

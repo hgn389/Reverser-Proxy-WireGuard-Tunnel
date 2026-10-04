@@ -9,6 +9,8 @@ acme_version="3.1.6"
 acme_sha256="0d3f9000ac44a6331314742a88c475f79134e24fc991997883652adc59efc486"
 wireguard="ask"
 wireguard_mode="ask"
+tailscale="no"
+vpn_backend="ask"
 acme="ask"
 web="ask"
 web_existing="no"
@@ -39,6 +41,7 @@ wg_client_address="${RPCTL_WG_CLIENT_ADDRESS:-$default_wg_client_address}"
 wg_port="${RPCTL_WG_PORT:-51820}"
 wg_peer_name="${RPCTL_WG_PEER_NAME:-client1}"
 wg_endpoint="${RPCTL_WG_ENDPOINT:-}"
+tailscale_auth_key_file="${RPCTL_TS_AUTH_KEY_FILE:-}"
 
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 info() { printf '%s\n' "$*"; }
@@ -371,16 +374,51 @@ SYSCTL
   info "Initial client configuration: ${client_config}"
 )
 
+write_vpn_mode() {
+  local mode=$1 temporary
+  [[ $mode == wireguard || $mode == tailscale || $mode == none ]] || die 'Internal VPN mode is invalid.'
+  if [[ -e /etc/rpctl/vpn-mode || -L /etc/rpctl/vpn-mode ]]; then
+    [[ -f /etc/rpctl/vpn-mode && ! -L /etc/rpctl/vpn-mode ]] || die 'Refusing to replace non-regular /etc/rpctl/vpn-mode.'
+  fi
+  temporary="/etc/rpctl/.vpn-mode.$$"
+  (umask 022; printf '%s\n' "$mode" > "$temporary")
+  chmod 0644 "$temporary"
+  mv -f "$temporary" /etc/rpctl/vpn-mode
+}
+
+configure_tailscale() {
+  /usr/bin/systemctl enable --now tailscaled
+  if /usr/bin/tailscale ip -4 >/dev/null 2>&1; then
+    info 'Existing Tailscale login was preserved.'
+  elif [[ -n $tailscale_auth_key_file ]]; then
+    [[ $tailscale_auth_key_file == /* ]] || die 'RPCTL_TS_AUTH_KEY_FILE must be an absolute path.'
+    [[ -f $tailscale_auth_key_file && ! -L $tailscale_auth_key_file ]] || die 'RPCTL_TS_AUTH_KEY_FILE must be a regular file and not a symbolic link.'
+    [[ $(stat -c '%u' "$tailscale_auth_key_file") == 0 ]] || die 'RPCTL_TS_AUTH_KEY_FILE must be owned by root.'
+    tailscale_key_mode=$(stat -c '%a' "$tailscale_auth_key_file")
+    (( (8#$tailscale_key_mode & 077) == 0 )) || die 'RPCTL_TS_AUTH_KEY_FILE permissions must be 0600 or stricter.'
+    /usr/bin/tailscale up --auth-key="file:${tailscale_auth_key_file}"
+  elif [[ $has_tty == yes ]]; then
+    info 'Tailscale will display a secure login URL. Complete the login to continue.'
+    /usr/bin/tailscale up
+  else
+    die 'Noninteractive Tailscale setup requires RPCTL_TS_AUTH_KEY_FILE unless this VPS is already logged in.'
+  fi
+  tailscale_ip=$(/usr/bin/tailscale ip -4 2>/dev/null | head -n 1)
+  [[ -n $tailscale_ip ]] || die 'Tailscale was installed but did not receive an IPv4 address.'
+  info "Tailscale is connected (${tailscale_ip})."
+}
+
 for arg in "$@"; do
   case "$arg" in
-    --wireguard|--wireguard-private|--wireguard-full|--no-wireguard)
-      [[ $wireguard_option_seen == no ]] || die 'Choose exactly one WireGuard option.'
+    --wireguard|--wireguard-private|--wireguard-full|--no-wireguard|--tailscale|--no-vpn)
+      [[ $wireguard_option_seen == no ]] || die 'Choose exactly one VPN option.'
       wireguard_option_seen=yes
       case "$arg" in
-        --wireguard) wireguard="yes"; wireguard_mode="none" ;;
-        --wireguard-private) wireguard="yes"; wireguard_mode="private" ;;
-        --wireguard-full) wireguard="yes"; wireguard_mode="full" ;;
-        --no-wireguard) wireguard="no"; wireguard_mode="none" ;;
+        --wireguard) wireguard="yes"; wireguard_mode="none"; vpn_backend="none" ;;
+        --wireguard-private) wireguard="yes"; wireguard_mode="private"; vpn_backend="wireguard" ;;
+        --wireguard-full) wireguard="yes"; wireguard_mode="full"; vpn_backend="wireguard" ;;
+        --tailscale) wireguard="no"; wireguard_mode="none"; tailscale="yes"; vpn_backend="tailscale" ;;
+        --no-wireguard|--no-vpn) wireguard="no"; wireguard_mode="none"; vpn_backend="none" ;;
       esac
       ;;
     --acme|--no-acme)
@@ -400,13 +438,15 @@ for arg in "$@"; do
       ;;
     --help)
       cat <<'HELP'
-Usage: install.sh [WIREGUARD] [--acme | --no-acme] [--web | --no-web] [--open-firewall | --no-firewall]
+Usage: install.sh [VPN] [--acme | --no-acme] [--web | --no-web] [--open-firewall | --no-firewall]
 
-WireGuard choices:
+VPN choices:
   --wireguard           Install tools only
   --wireguard-private   Configure private VPN (default interactive mode)
   --wireguard-full      Configure full-tunnel VPN
-  --no-wireguard        Do not install WireGuard
+  --tailscale           Install and connect Tailscale
+  --no-vpn              Do not install a VPN
+  --no-wireguard        Legacy alias for --no-vpn
 
 SSL choices:
   --acme                Install acme.sh and the certificate renewal timer
@@ -423,6 +463,8 @@ Set RPCTL_REPO=owner/repo to select your GitHub repository.
 Set RPCTL_VERSION=vX.Y.Z to install a specific release.
 Set RPCTL_WG_NETWORK to a canonical private IPv4 CIDR to derive the server and
 initial peer addresses automatically. Advanced RPCTL_WG_* overrides remain available.
+For noninteractive --tailscale, set RPCTL_TS_AUTH_KEY_FILE to a root-owned regular
+file with permissions 0600 or stricter. The file is read directly by Tailscale.
 For noninteractive --web, set RPCTL_WEB_USERNAME and RPCTL_WEB_PASSWORD_FILE
 (a regular file with permissions 0600 or stricter). RPCTL_WEB_DOMAIN is optional;
 without it, the panel listens on public port 9080.
@@ -483,14 +525,45 @@ if ((web_path_count == 4)); then
   info 'Existing Web Panel installation detected; its configuration will be preserved.'
 fi
 
-if [[ $wireguard == ask ]]; then
-  if [[ $has_tty == yes ]]; then
-    printf 'Install WireGuard tools now? [y/N] ' > /dev/tty
-    IFS= read -r answer < /dev/tty || die 'Could not read terminal input.'
-    case "$answer" in y|Y|yes|YES) wireguard=yes ;; *) wireguard=no ;; esac
-  else
-    die 'No terminal detected. Pass --wireguard or --no-wireguard.'
+existing_vpn_backend=''
+if [[ -e /etc/rpctl/vpn-mode || -L /etc/rpctl/vpn-mode ]]; then
+  [[ -f /etc/rpctl/vpn-mode && ! -L /etc/rpctl/vpn-mode ]] || die 'Existing /etc/rpctl/vpn-mode is not a regular file.'
+  existing_vpn_backend=$(tr -d '[:space:]' < /etc/rpctl/vpn-mode)
+  [[ $existing_vpn_backend == wireguard || $existing_vpn_backend == tailscale || $existing_vpn_backend == none ]] || \
+    die 'Existing /etc/rpctl/vpn-mode contains an invalid value.'
+elif [[ -f "/etc/wireguard/${wg_interface}.conf" && ! -L "/etc/wireguard/${wg_interface}.conf" ]]; then
+  existing_vpn_backend=wireguard
+elif [[ -f /var/lib/tailscale/tailscaled.state && ! -L /var/lib/tailscale/tailscaled.state ]]; then
+  existing_vpn_backend=tailscale
+fi
+
+if [[ $vpn_backend != ask && -n $existing_vpn_backend && $existing_vpn_backend != none && $vpn_backend != "$existing_vpn_backend" ]]; then
+  die "This VPS already uses ${existing_vpn_backend}. The installer will not switch an active VPN backend automatically."
+fi
+if [[ $vpn_backend == ask && -n $existing_vpn_backend ]]; then
+  vpn_backend=$existing_vpn_backend
+  wireguard=no
+  wireguard_mode=none
+  tailscale=no
+  if [[ $vpn_backend == wireguard ]]; then
+    wireguard=yes
   fi
+  info "Existing ${vpn_backend} VPN selection detected; it will be preserved."
+elif [[ $vpn_backend == ask ]]; then
+  if [[ $has_tty != yes ]]; then
+    die 'No terminal detected. Pass --wireguard-private, --wireguard-full, --tailscale, or --no-vpn.'
+  fi
+  printf '\nSelect VPN backend:\n' > /dev/tty
+  printf '  1) WireGuard (default)\n' > /dev/tty
+  printf '  2) Tailscale\n' > /dev/tty
+  printf '  3) No VPN\n' > /dev/tty
+  printf 'Select [1]: ' > /dev/tty
+  IFS= read -r answer < /dev/tty || die 'Could not read terminal input.'
+  case "$answer" in
+    2) vpn_backend=tailscale; tailscale=yes; wireguard=no; wireguard_mode=none ;;
+    3) vpn_backend=none; tailscale=no; wireguard=no; wireguard_mode=none ;;
+    *) vpn_backend=wireguard; tailscale=no; wireguard=yes ;;
+  esac
 fi
 if [[ $wireguard == yes && $wireguard_mode == ask ]]; then
   if [[ $has_tty == yes ]]; then
@@ -505,8 +578,11 @@ if [[ $wireguard == yes && $wireguard_mode == ask ]]; then
         ;;
     esac
   else
-    die 'No terminal detected. Pass --wireguard, --wireguard-private, --wireguard-full, or --no-wireguard.'
+    die 'No terminal detected. Pass --wireguard, --wireguard-private, or --wireguard-full.'
   fi
+fi
+if [[ $vpn_backend == wireguard && $wireguard_mode == none && $existing_vpn_backend != wireguard ]]; then
+  vpn_backend=none
 fi
 if [[ $wireguard_mode == private || $wireguard_mode == full ]]; then
   select_wireguard_network
@@ -571,6 +647,28 @@ new_binary=""
 trap 'rm -rf -- "$workdir"; if [[ -n $new_binary ]]; then rm -f -- "$new_binary"; fi' EXIT
 info "Downloading ${asset} from ${repo}..."
 curl_flags=(--fail --location --silent --show-error --retry 3 --connect-timeout 15 --proto '=https' --proto-redir '=https' --tlsv1.2)
+tailscale_repo_new=no
+tailscale_package_needed=no
+if [[ $tailscale == yes && ! -x /usr/bin/tailscale ]]; then
+  tailscale_package_needed=yes
+  tailscale_keyring=/usr/share/keyrings/tailscale-archive-keyring.gpg
+  tailscale_list=/etc/apt/sources.list.d/tailscale.list
+  if [[ ! -e $tailscale_keyring && ! -L $tailscale_keyring && ! -e $tailscale_list && ! -L $tailscale_list ]]; then
+    info 'Downloading the official Tailscale APT repository configuration...'
+    curl "${curl_flags[@]}" --max-time 60 --max-filesize 1048576 \
+      -o "$workdir/tailscale-archive-keyring.gpg" "https://pkgs.tailscale.com/stable/ubuntu/${VERSION_CODENAME}.noarmor.gpg" || \
+      die 'Tailscale repository key download failed.'
+    curl "${curl_flags[@]}" --max-time 60 --max-filesize 1048576 \
+      -o "$workdir/tailscale.list" "https://pkgs.tailscale.com/stable/ubuntu/${VERSION_CODENAME}.tailscale-keyring.list" || \
+      die 'Tailscale repository configuration download failed.'
+    [[ -s $workdir/tailscale-archive-keyring.gpg && -s $workdir/tailscale.list ]] || die 'Downloaded Tailscale repository files are empty.'
+    tailscale_repo_new=yes
+  elif [[ -f $tailscale_keyring && ! -L $tailscale_keyring && -f $tailscale_list && ! -L $tailscale_list ]]; then
+    info 'Existing Tailscale APT repository configuration was preserved.'
+  else
+    die 'Incomplete or unsafe Tailscale APT repository configuration exists; inspect /usr/share/keyrings and /etc/apt/sources.list.d.'
+  fi
+fi
 curl "${curl_flags[@]}" --max-time 180 --max-filesize 52428800 -o "$workdir/$asset" "$base/$asset" || die 'Binary download failed.'
 curl "${curl_flags[@]}" --max-time 60 --max-filesize 1048576 -o "$workdir/SHA256SUMS" "$base/SHA256SUMS" || die 'Checksum download failed.'
 expected=$(awk -v file="$asset" '$2 == file { print $1 }' "$workdir/SHA256SUMS")
@@ -607,10 +705,16 @@ fi
 
 info 'Installing Nginx and required tools...'
 export DEBIAN_FRONTEND=noninteractive
+if [[ $tailscale_repo_new == yes ]]; then
+  install -d -m 0755 /usr/share/keyrings /etc/apt/sources.list.d
+  install -m 0644 "$workdir/tailscale-archive-keyring.gpg" /usr/share/keyrings/tailscale-archive-keyring.gpg
+  install -m 0644 "$workdir/tailscale.list" /etc/apt/sources.list.d/tailscale.list
+fi
 apt-get update
 packages=(nginx ca-certificates)
 if [[ $wireguard == yes ]]; then packages+=(wireguard-tools); fi
 if [[ $wireguard_mode == full ]]; then packages+=(iptables); fi
+if [[ $tailscale_package_needed == yes ]]; then packages+=(tailscale); fi
 apt-get install -y --no-install-recommends "${packages[@]}"
 
 install -d -m 0755 /etc/rpctl/sites
@@ -717,6 +821,10 @@ fi
 if [[ $wireguard_mode == private || $wireguard_mode == full ]]; then
   configure_wireguard
 fi
+if [[ $tailscale == yes ]]; then
+  configure_tailscale
+fi
+write_vpn_mode "$vpn_backend"
 
 if [[ $ufw_active == yes && $firewall == yes ]]; then
   info 'Applying firewall rule: ufw allow 80/tcp'
@@ -813,6 +921,9 @@ if [[ $web == yes ]]; then
   info "Password:         ${web_password_display}"
   if [[ -f /etc/rpctl/wireguard/peers/client1.conf ]]; then
     info 'Client configuration: /etc/rpctl/wireguard/peers/client1.conf'
+  fi
+  if [[ $vpn_backend == tailscale && -x /usr/bin/tailscale ]]; then
+    info "Tailscale address: $(/usr/bin/tailscale ip -4 2>/dev/null | head -n 1)"
   fi
   info 'Terminal menu:    rp'
   info '############################################################'

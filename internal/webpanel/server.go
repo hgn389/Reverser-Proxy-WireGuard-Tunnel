@@ -1,6 +1,7 @@
 package webpanel
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
@@ -26,6 +27,9 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"rpctl/internal/proxy"
+	"rpctl/internal/tailscale"
+	"rpctl/internal/updater"
+	"rpctl/internal/vpnmode"
 	"rpctl/internal/wireguard"
 	webassets "rpctl/web"
 )
@@ -60,18 +64,25 @@ type Server struct {
 	attempts   map[string]loginAttempt
 	blocks     IPBlockStore
 	loginSlots chan struct{}
+	updateMu   sync.Mutex
+	updateInfo updater.Status
+	updateErr  string
+	updateTime time.Time
 }
 
 type dashboardData struct {
-	Version     string
-	PanelDomain string
-	PublicURL   string
-	CSRF        string
-	Message     string
-	Sites       []dashboardSite
-	Peers       []wireguard.Peer
-	PeerError   string
-	Metrics     systemMetrics
+	Version        string
+	PanelDomain    string
+	PublicURL      string
+	CSRF           string
+	Message        string
+	Sites          []dashboardSite
+	Peers          []wireguard.Peer
+	PeerError      string
+	VPNMode        string
+	Tailscale      tailscale.Status
+	TailscaleError string
+	Metrics        systemMetrics
 }
 
 type dashboardSite struct {
@@ -91,6 +102,7 @@ type loginData struct {
 type guideData struct {
 	Version string
 	CSRF    string
+	VPNMode string
 }
 
 type systemMetrics struct {
@@ -142,6 +154,7 @@ func (s *Server) Run() error {
 		MaxHeaderBytes:    16 << 10,
 	}
 	log.Printf("INFO web panel listening on %s", s.config.Listen)
+	go s.updateCheckLoop()
 	return server.ListenAndServe()
 }
 
@@ -170,6 +183,7 @@ func (s *Server) Handler() (http.Handler, error) {
 	mux.Handle("GET /wireguard/peer/qr", s.auth(http.HandlerFunc(s.wgPeerQR)))
 	mux.Handle("POST /system/nginx-restart", s.auth(s.csrf(http.HandlerFunc(s.nginxRestart))))
 	mux.Handle("POST /system/update", s.auth(s.csrf(http.HandlerFunc(s.systemUpdate))))
+	mux.Handle("GET /system/update-status", s.auth(http.HandlerFunc(s.systemUpdateStatus)))
 	mux.Handle("POST /system/reboot", s.auth(s.csrf(http.HandlerFunc(s.systemReboot))))
 
 	return s.securityHeaders(s.validHost(mux)), nil
@@ -314,18 +328,30 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not read managed sites", http.StatusInternalServerError)
 		return
 	}
-	peers, peerError := s.wireGuardPeers()
+	mode := vpnmode.Detect()
+	var peers []wireguard.Peer
+	var peerError string
+	var tailscaleStatus tailscale.Status
+	var tailscaleError string
+	if mode == vpnmode.WireGuard {
+		peers, peerError = s.wireGuardPeers()
+	} else if mode == vpnmode.Tailscale {
+		tailscaleStatus, tailscaleError = s.tailscaleStatus()
+	}
 	certificateStatuses, certificateError := s.certificateStatuses()
 	s.render(w, "dashboard.html", dashboardData{
-		Version:     s.version,
-		PanelDomain: s.config.Domain,
-		PublicURL:   PublicURL(s.config),
-		CSRF:        current.CSRF,
-		Message:     r.URL.Query().Get("message"),
-		Sites:       buildDashboardSites(sites, certificateStatuses, certificateError),
-		Peers:       peers,
-		PeerError:   peerError,
-		Metrics:     readSystemMetrics(),
+		Version:        s.version,
+		PanelDomain:    s.config.Domain,
+		PublicURL:      PublicURL(s.config),
+		CSRF:           current.CSRF,
+		Message:        r.URL.Query().Get("message"),
+		Sites:          buildDashboardSites(sites, certificateStatuses, certificateError),
+		Peers:          peers,
+		PeerError:      peerError,
+		VPNMode:        string(mode),
+		Tailscale:      tailscaleStatus,
+		TailscaleError: tailscaleError,
+		Metrics:        readSystemMetrics(),
 	})
 }
 
@@ -401,7 +427,24 @@ func (s *Server) guide(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "guide.html", guideData{
 		Version: s.version,
 		CSRF:    current.CSRF,
+		VPNMode: string(vpnmode.Detect()),
 	})
+}
+
+func (s *Server) tailscaleStatus() (tailscale.Status, string) {
+	client, ok := s.privileged.(PrivilegedDataClient)
+	if !ok {
+		return tailscale.Status{}, "Tailscale status is unavailable."
+	}
+	data, err := client.ExecuteData(PrivilegedRequest{Operation: "tailscale_status"})
+	if err != nil {
+		return tailscale.Status{}, err.Error()
+	}
+	var status tailscale.Status
+	if err := json.Unmarshal([]byte(data), &status); err != nil {
+		return tailscale.Status{}, "The privileged helper returned invalid Tailscale status data."
+	}
+	return status, ""
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
@@ -558,6 +601,56 @@ func (s *Server) systemUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("AUDIT user=%q action=%q", s.config.Username, request.Operation)
 	redirectMessage(w, r, message)
+}
+
+func (s *Server) systemUpdateStatus(w http.ResponseWriter, r *http.Request) {
+	status, err := s.latestUpdateStatus(r.Context())
+	if err != nil {
+		http.Error(w, "update check is temporarily unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(status); err != nil {
+		log.Printf("ERROR encoding update status: %v", err)
+	}
+}
+
+func (s *Server) latestUpdateStatus(ctx context.Context) (updater.Status, error) {
+	s.updateMu.Lock()
+	defer s.updateMu.Unlock()
+	if !s.updateTime.IsZero() && time.Since(s.updateTime) < time.Hour {
+		return s.updateInfo, errorFromMessage(s.updateErr)
+	}
+	checkContext, cancel := context.WithTimeout(ctx, 45*time.Second)
+	defer cancel()
+	status, err := updater.DefaultManager().CheckLatest(checkContext, s.version)
+	s.updateTime = time.Now()
+	s.updateInfo = status
+	s.updateErr = ""
+	if err != nil {
+		s.updateErr = err.Error()
+		log.Printf("WARNING update check failed: %v", err)
+	}
+	return status, err
+}
+
+func (s *Server) updateCheckLoop() {
+	_, _ = s.latestUpdateStatus(context.Background())
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+	for range ticker.C {
+		s.updateMu.Lock()
+		s.updateTime = time.Time{}
+		s.updateMu.Unlock()
+		_, _ = s.latestUpdateStatus(context.Background())
+	}
+}
+
+func errorFromMessage(message string) error {
+	if message == "" {
+		return nil
+	}
+	return errors.New(message)
 }
 
 func (s *Server) systemReboot(w http.ResponseWriter, r *http.Request) {

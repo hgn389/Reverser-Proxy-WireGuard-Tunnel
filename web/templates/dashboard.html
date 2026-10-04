@@ -16,13 +16,17 @@
     <div class="header-actions"><a class="github-link" href="https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel" target="_blank" rel="noopener noreferrer">GitHub</a><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="secondary">Sign out</button></form></div>
   </header>
   <main>
+    <div class="update-banner" id="update-banner" data-session="{{.CSRF}}" hidden>
+      <span>A new version <strong id="update-version"></strong> is available.</span>
+      <form method="post" action="/system/update"><input type="hidden" name="csrf" value="{{.CSRF}}"><button type="submit" class="update-now">Update now!</button></form>
+      <button type="button" class="update-dismiss" id="update-dismiss" aria-label="Dismiss update notification">&times;</button>
+    </div>
     {{if .Message}}<div class="alert">{{.Message}}</div>{{end}}
     <section>
       <div class="section-heading">
         <h2>System</h2>
         <div class="system-actions">
           <form method="post" action="/system/nginx-restart"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="secondary">Restart Nginx</button></form>
-          <details class="update-confirm"><summary>Update rpctl</summary><div><p>Download, verify, and install the latest GitHub release?</p><form method="post" action="/system/update"><input type="hidden" name="csrf" value="{{.CSRF}}"><button>Confirm Update</button></form></div></details>
           <details class="reboot-confirm"><summary>Reboot VPS</summary><div><p>The VPS and all hosted websites will be temporarily unavailable.</p><form method="post" action="/system/reboot"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="danger">Confirm Reboot</button></form></div></details>
         </div>
       </div>
@@ -40,6 +44,7 @@
       </dl>
     </section>
 
+    {{if or (eq .VPNMode "wireguard") (eq .VPNMode "")}}
     <section>
       <h2>WireGuard peers - Add a device</h2>
       <form class="peer-form" method="post" action="/wireguard/peer/add">
@@ -106,20 +111,74 @@
         <p class="qr-security-note">This QR code contains the peer's private key. Scan it only with the intended device.</p>
       </div>
     </dialog>
+    {{else if eq .VPNMode "tailscale"}}
+    <section>
+      <div class="section-heading">
+        <div>
+          <h2>Tailscale network</h2>
+          <p class="form-hint">Devices join this network by signing in to the same tailnet. Device approval and access rules are managed in the Tailscale Admin Console.</p>
+        </div>
+        <a class="button-link secondary" href="https://login.tailscale.com/admin/machines" target="_blank" rel="noopener noreferrer">Open Admin Console</a>
+      </div>
+      {{if .TailscaleError}}
+      <div class="alert error">{{.TailscaleError}}</div>
+      {{else}}
+      <dl class="tailscale-summary">
+        <div><dt>Status</dt><dd>{{.Tailscale.BackendState}}</dd></div>
+        <div><dt>Tailnet</dt><dd>{{if .Tailscale.Tailnet}}{{.Tailscale.Tailnet}}{{else}}unavailable{{end}}</dd></div>
+        <div><dt>This device</dt><dd>{{.Tailscale.Self.Name}}</dd></div>
+        <div><dt>Tailscale IP</dt><dd>{{range .Tailscale.Self.IPs}}<code>{{.}}</code> {{else}}unavailable{{end}}</dd></div>
+      </dl>
+      <div class="table-wrap">
+        <table class="tailscale-table">
+          <thead><tr><th>Device</th><th>Tailscale IP</th><th>DNS name</th><th>OS</th><th>State</th></tr></thead>
+          <tbody>
+          {{range .Tailscale.Peers}}
+            <tr>
+              <td data-label="Device">{{.Name}}</td>
+              <td data-label="Tailscale IP">{{range .IPs}}<code>{{.}}</code> {{else}}—{{end}}</td>
+              <td data-label="DNS name">{{if .DNSName}}<code>{{.DNSName}}</code>{{else}}—{{end}}</td>
+              <td data-label="OS">{{if .OS}}{{.OS}}{{else}}—{{end}}</td>
+              <td data-label="State"><span class="status {{if .Online}}enabled{{else}}disabled{{end}}">{{if .Online}}online{{else}}offline{{end}}</span></td>
+            </tr>
+          {{else}}
+            <tr><td class="empty" colspan="5">No other Tailscale devices were returned.</td></tr>
+          {{end}}
+          </tbody>
+        </table>
+      </div>
+      <div class="peer-help"><ul>
+        <li>Install Tailscale on each server or mobile device and sign in to the same tailnet.</li>
+        <li>Use a device's <code>100.x.x.x</code> address or MagicDNS name as the reverse proxy upstream.</li>
+        <li>Access depends on the grants or ACLs configured for the tailnet.</li>
+        <li><a href="https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel/blob/main/README.md" target="_blank" rel="noopener noreferrer">Setup guide</a>.</li>
+      </ul></div>
+      {{end}}
+    </section>
+    {{else}}
+    <section>
+      <h2>VPN</h2>
+      <p>No VPN backend is configured. Reverse proxies can still use public or private upstream addresses that this VPS can reach.</p>
+    </section>
+    {{end}}
 
     <section>
       <h2>Add proxy</h2>
       <form class="inline-form" method="post" action="/proxy/add">
         <input type="hidden" name="csrf" value="{{.CSRF}}">
         <label>Domain<input name="domain" placeholder="app.example.com" required></label>
-        <label>Upstream<input name="upstream" placeholder="http://10.10.10.2:80" required></label>
+        <label>Upstream<input name="upstream" placeholder="{{if eq .VPNMode "tailscale"}}http://100.64.0.2:80{{else}}http://10.10.10.2:80{{end}}" required></label>
         <button type="submit">Add</button>
       </form>
       <div class="proxy-help">
+        {{if eq .VPNMode "tailscale"}}
+        <p><strong>Ex:</strong> <code>shop.example.com</code> &rarr; VPS-1 &rarr; Tailscale &rarr; VPS-2 Webserver(<code>http://100.64.0.25:80</code>)</p>
+        {{else}}
         <p><strong>Ex:</strong> <code>shop.example.com</code> &rarr; VPS-1(<code>10.10.10.1</code>) &rarr; WireGuard &rarr; VPS-2 Webserver(<code>http://10.10.10.25:80</code>)</p>
+        {{end}}
         <ul>
           <li><strong>Domain:</strong> the public hostname that visitors use to access your website or application.</li>
-          <li><strong>Upstream:</strong> the HTTP address of the web server that VPS-1 forwards requests to, such as <code>http://10.10.10.25:80</code> or <code>http://10.10.10.212:3000</code>.</li>
+          <li><strong>Upstream:</strong> the HTTP address of the web server that VPS-1 forwards requests to, such as {{if eq .VPNMode "tailscale"}}<code>http://100.64.0.25:80</code> or a MagicDNS name{{else}}<code>http://10.10.10.25:80</code> or <code>http://10.10.10.212:3000</code>{{end}}.</li>
           <li>The website or application must already be running on the upstream device, and VPS-1 must be able to reach its address.</li>
           <li>After adding the proxy, use the <strong>Reverse proxies</strong> section to issue an SSL certificate for the domain.</li>
         </ul>

@@ -18,6 +18,86 @@
     <div class="header-actions"><a class="github-link" href="https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel" target="_blank" rel="noopener noreferrer">GitHub</a><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="secondary">Sign out</button></form></div>
   </header>
   <main class="guide">
+    {{if eq .VPNMode "tailscale"}}
+    <section>
+      <h1>Tailscale Configuration Guide</h1>
+      <p>VPS-1 is the public reverse proxy. VPS-2 through VPS-N run websites or private services. Every server and client signs in to the same Tailscale tailnet.</p>
+      <pre>Internet → VPS-1 (rpctl, Nginx, SSL, Tailscale)
+                    ↓ encrypted Tailscale network
+          VPS-2 100.x.x.x · VPS-3 100.x.x.x · mobile devices</pre>
+      <div class="guide-note"><strong>Control access in your tailnet policy.</strong> Only approved users and devices should be allowed to reach private web services.</div>
+    </section>
+
+    <section>
+      <h2>Step 1 — Install VPS-1</h2>
+      <p>Use a clean Ubuntu Server 22.04 LTS or 24.04 LTS VPS with a public IPv4 address. Allow SSH and TCP ports 80 and 443 in the provider firewall.</p>
+      <pre><code>sudo apt update
+sudo apt install -y git
+git clone https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel.git rpctl
+cd rpctl
+sudo bash scripts/install.sh</code></pre>
+      <p>Select <strong>Tailscale</strong> as the VPN backend. The installer installs the official stable package, starts <code>tailscaled</code>, and displays a login URL. Complete the login before continuing.</p>
+      <pre><code>sudo rpctl status
+sudo rpctl tailscale status
+tailscale ip -4</code></pre>
+    </section>
+
+    <section>
+      <h2>Step 2 — Add VPS-2 Through VPS-N</h2>
+      <p>Install Tailscale on every upstream server and sign in to the same tailnet. Follow the official Linux installation instructions for that server, then verify its address:</p>
+      <pre><code>curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up
+tailscale ip -4
+tailscale status</code></pre>
+      <p>When device approval is enabled, approve the server in the Tailscale Admin Console. Apply grants or ACLs that allow VPS-1 to reach the required application ports.</p>
+    </section>
+
+    <section>
+      <h2>Step 3 — Prepare and Test the Website</h2>
+      <p>Run the website on the upstream server and make it listen on its Tailscale address or <code>0.0.0.0</code>. Use the real address returned by <code>tailscale ip -4</code>.</p>
+      <pre><code># Run on VPS-1 and replace the example address
+ping -c 4 100.101.102.103
+curl -I -H 'Host: shop.example.com' http://100.101.102.103:80</code></pre>
+      <p>The HTTP request should normally return 200, 301, or 302 before the reverse proxy is created.</p>
+    </section>
+
+    <section>
+      <h2>Step 4 — Add DNS, Reverse Proxy, and SSL</h2>
+      <ol>
+        <li>Create an A record for <code>shop.example.com</code> pointing to the public IPv4 address of VPS-1.</li>
+        <li>Open Dashboard and add <code>shop.example.com</code>.</li>
+        <li>Use the upstream device's Tailscale address, such as <code>http://100.101.102.103:80</code>, or its MagicDNS name.</li>
+        <li>After DNS reaches VPS-1, issue the SSL certificate in the Reverse proxies section.</li>
+      </ol>
+      <p>Public traffic terminates at VPS-1. The connection from VPS-1 to the upstream server travels through Tailscale.</p>
+    </section>
+
+    <section>
+      <h2>Connect a Computer or Mobile Device</h2>
+      <ol>
+        <li>Install the official Tailscale application on Windows, macOS, iOS, or Android.</li>
+        <li>Sign in to the same tailnet used by VPS-1.</li>
+        <li>Approve the device when tailnet device approval is enabled.</li>
+        <li>Confirm that the tailnet policy allows the device to reach the intended server and port.</li>
+        <li>Open the private service through its Tailscale IP or MagicDNS name.</li>
+      </ol>
+      <p>Tailscale does not use the WireGuard peer configuration files or QR codes shown in WireGuard mode.</p>
+    </section>
+
+    <section>
+      <h2>Common Problems</h2>
+      <ul>
+        <li><strong>Device is missing:</strong> confirm that it signed in to the same tailnet and was approved.</li>
+        <li><strong>Ping or HTTP is blocked:</strong> review the tailnet grants or ACLs and the upstream server firewall.</li>
+        <li><strong>502 Bad Gateway:</strong> VPS-1 cannot reach the configured upstream address and port.</li>
+        <li><strong>SSL cannot renew:</strong> keep public DNS pointed to VPS-1 and port 80 reachable for the HTTP-01 challenge.</li>
+      </ul>
+      <pre><code>sudo rpctl status
+sudo rpctl tailscale status
+tailscale netcheck
+sudo rpctl system nginx-test</code></pre>
+    </section>
+    {{else}}
     <section>
       <h1>Configuration Guide</h1>
       <p>VPS-1 is the public reverse proxy. VPS-2 through VPS-N run websites or private services. Each server or device that joins WireGuard must use its own peer configuration.</p>
@@ -168,6 +248,7 @@ sudo rpctl ssl status
 sudo rpctl wg peer list
 sudo wg show</code></pre>
     </section>
+    {{end}}
   </main>
   <footer><strong>rpctl v{{.Version}}</strong><span aria-hidden="true">&copy;</span><span>by <a href="https://hoanggiangnam.com" target="_blank" rel="noopener noreferrer">Nam Hoàng</a></span></footer>
 </body>
