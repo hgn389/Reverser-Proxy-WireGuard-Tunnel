@@ -7,6 +7,7 @@
   <title>rpctl dashboard</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
 </head>
 <body>
   <header>
@@ -40,7 +41,7 @@
     </section>
 
     <section>
-      <h2>WireGuard peers</h2>
+      <h2>WireGuard peers - Add a device</h2>
       <form class="peer-form" method="post" action="/wireguard/peer/add">
         <input type="hidden" name="csrf" value="{{.CSRF}}">
         <label>Peer name (optional)<input name="peer" placeholder="client2" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,31}" maxlength="32"></label>
@@ -52,14 +53,21 @@
       {{else}}
       <div class="table-wrap peer-table-wrap">
         <table class="peer-table">
-          <thead><tr><th>Name</th><th>VPN address</th><th>Client configuration</th><th>QR</th><th>Actions</th></tr></thead>
+          <colgroup>
+            <col class="peer-name-column">
+            <col class="peer-address-column">
+            <col class="peer-qr-column">
+            <col class="peer-config-column">
+            <col class="peer-actions-column">
+          </colgroup>
+          <thead><tr><th>Name</th><th>VPN address</th><th>QR</th><th>Client configuration</th><th>Actions</th></tr></thead>
           <tbody>
           {{range .Peers}}
             <tr>
               <td data-label="Name">{{.Name}}</td>
               <td data-label="VPN address"><code>{{.Address}}</code></td>
-              <td data-label="Configuration"><code>{{.ConfigPath}}</code></td>
-              <td data-label="QR" class="qr-cell"><a href="/wireguard/peer/qr?peer={{.Name}}" target="_blank" rel="noopener noreferrer" title="Open QR code for {{.Name}}"><img src="/wireguard/peer/qr?peer={{.Name}}" width="120" height="120" loading="lazy" alt="WireGuard QR code for {{.Name}}"></a></td>
+              <td data-label="QR" class="qr-cell"><button type="button" class="qr-view-button" data-qr-peer="{{.Name}}" aria-haspopup="dialog">View QR</button></td>
+              <td data-label="Configuration" class="peer-config-cell"><code>{{.ConfigPath}}</code></td>
               <td data-label="Actions" class="actions-cell peer-actions-cell"><div class="actions-content peer-actions">
                 <form method="post" action="/wireguard/peer/download"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="peer" value="{{.Name}}"><button class="secondary">Download</button></form>
                 <details class="reboot-confirm peer-delete-confirm"><summary>Delete</summary><div><p>Delete WireGuard peer <strong>{{.Name}}</strong>?</p><form method="post" action="/wireguard/peer/delete"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="peer" value="{{.Name}}"><button class="danger">Confirm Delete</button></form></div></details>
@@ -71,8 +79,33 @@
           </tbody>
         </table>
       </div>
+      <div class="peer-help">
+        <ul>
+          <li><strong>Name:</strong> the name of the newly added device.</li>
+          <li><strong>VPN address:</strong> the private VPN IP address that VPS-1 assigns to the newly added device.</li>
+          <li>Download the peer configuration file, such as <code>client1.conf</code>, to connect VPS-2, Windows, Linux, or another device to VPS-1. <a href="https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel/blob/main/README.md" target="_blank" rel="noopener noreferrer">Setup guide</a>.</li>
+          <li>Use the QR code to connect a mobile device quickly.</li>
+        </ul>
+      </div>
       {{end}}
     </section>
+
+    <dialog class="qr-dialog" id="wireguard-qr-dialog" aria-labelledby="wireguard-qr-title">
+      <div class="qr-dialog-content">
+        <div class="qr-dialog-heading">
+          <div>
+            <h2 id="wireguard-qr-title">WireGuard QR code</h2>
+            <p id="wireguard-qr-peer"></p>
+          </div>
+          <form method="dialog"><button class="secondary qr-dialog-close" aria-label="Close QR code dialog">Close</button></form>
+        </div>
+        <div class="qr-frame">
+          <p id="wireguard-qr-status">Loading QR code...</p>
+          <img id="wireguard-qr-image" hidden alt="">
+        </div>
+        <p class="qr-security-note">This QR code contains the peer's private key. Scan it only with the intended device.</p>
+      </div>
+    </dialog>
 
     <section>
       <h2>Add proxy</h2>
@@ -82,6 +115,15 @@
         <label>Upstream<input name="upstream" placeholder="http://10.10.0.2:80" required></label>
         <button type="submit">Add</button>
       </form>
+      <div class="proxy-help">
+        <p><strong>Ex:</strong> <code>shop.example.com</code> &rarr; VPS-1(<code>10.10.0.1</code>) &rarr; WireGuard &rarr; VPS-2 Webserver(<code>http://10.10.0.25:80</code>)</p>
+        <ul>
+          <li><strong>Domain:</strong> the public hostname that visitors use to access your website or application.</li>
+          <li><strong>Upstream:</strong> the HTTP address of the web server that VPS-1 forwards requests to, such as <code>http://10.10.0.25:80</code> or <code>http://10.10.0.212:3000</code>.</li>
+          <li>The website or application must already be running on the upstream device, and VPS-1 must be able to reach its address.</li>
+          <li>After adding the proxy, use the <strong>Reverse proxies</strong> section to issue an SSL certificate for the domain.</li>
+        </ul>
+      </div>
     </section>
 
     <section>

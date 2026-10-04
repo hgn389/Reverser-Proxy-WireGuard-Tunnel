@@ -4,7 +4,7 @@
 
 ### 1. VPS-1 — Reverse Proxy
 
-This v1.0.3 installer supports **Ubuntu Server 22.04 LTS and 24.04 LTS** on `amd64` and `arm64`. Run this command on a clean VPS:
+This v1.0.4 installer supports **Ubuntu Server 22.04 LTS and 24.04 LTS** on `amd64` and `arm64`. Run this command on a clean VPS:
 
 ```bash
 sudo apt update && sudo apt install -y ca-certificates curl git && git clone https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel.git rpctl && cd rpctl && sudo bash scripts/install.sh
@@ -19,7 +19,7 @@ grep -n 'ubuntu:22.04' scripts/install.sh
 sudo bash scripts/install.sh
 ```
 
-The `grep` command must show `ubuntu:22.04|ubuntu:24.04`. The installer then downloads the latest GitHub Release, so the repository owner must publish the v1.0.3 release assets before this installation is used.
+The `grep` command must show `ubuntu:22.04|ubuntu:24.04`. The installer then downloads the latest GitHub Release, so the repository owner must publish the v1.0.4 release assets before this installation is used.
 
 Select **WireGuard private mode** in the installer. The VPS-2 client configuration will be created at:
 
@@ -77,7 +77,7 @@ Every additional website server needs its own WireGuard peer and client configur
 Use one of these methods:
 
 - Terminal menu: run `sudo rp`, select **13. WireGuard peers**, then **2. Add peer**.
-- Web Panel: open **WireGuard peers**, select **Create peer**, then download its client configuration.
+- Web Panel: open **WireGuard peers - Add a device**, select **Create peer**, then download its client configuration.
 - Command line:
 
   ```bash
@@ -620,7 +620,7 @@ sudo rpctl web public-access disable
 
 When UFW is active, rpctl adds port `9080/tcp` only while direct access is enabled and removes only the rule marked as managed by rpctl. A domain and IP:port can remain active together. The Dashboard shows the direct URL beside **Webpanel Dashboard** while it is enabled.
 
-The panel provides the VPS and WireGuard/Tailscale addresses, CPU, RAM, swap, SSD and uptime summaries, managed proxy CRUD, WireGuard peer creation/deletion, client configuration downloads and QR codes, per-domain SSL issue/renew buttons, certificate expiration days, checksum-verified rpctl updates, controlled Nginx restart and VPS reboot actions, and an authenticated **Configuration Guide** page for VPS-1/VPS-2/VPS-N and desktop/mobile WireGuard clients. The guide is available at `/guide`. The header includes the project GitHub link beside Sign out. The footer reads the running version directly from the compiled binary, so every correctly built update displays its own version automatically. The layout expands on desktop and changes tables into mobile cards on narrow screens. Its red-lock favicon, HTML, and CSS are embedded in the same binary. It does not install Node.js, PHP, a database, or another binary.
+The panel provides the VPS and WireGuard/Tailscale addresses, CPU, RAM, swap, SSD and uptime summaries, managed proxy CRUD, WireGuard peer creation/deletion, client configuration downloads and QR codes, per-domain SSL issue/renew buttons, certificate expiration days, checksum-verified rpctl updates, controlled Nginx restart and VPS reboot actions, and an authenticated **Configuration Guide** page for VPS-1/VPS-2/VPS-N and desktop/mobile WireGuard clients. The Add proxy section includes an example route and explains the domain, upstream address, connectivity requirement, and next SSL step. The guide is available at `/guide`. The header includes the project GitHub link beside Sign out. The footer reads the running version directly from the compiled binary, so every correctly built update displays its own version automatically. The layout expands on desktop and changes tables into mobile cards on narrow screens. Its red-lock favicon, HTML, CSS, and JavaScript are embedded in the same binary. It does not install Node.js, PHP, a database, or another binary.
 
 With IP:port access disabled, the service binds only to `127.0.0.1:9080` and Nginx is the public HTTPS entry point. Domain sessions use Secure, HttpOnly, SameSite Strict cookies. Direct `http://IP:9080` sessions use separate HttpOnly, SameSite Strict cookies because browsers cannot send Secure cookies over HTTP. Use direct HTTP as a temporary recovery path on a trusted network; it does not encrypt credentials or session traffic. State-changing forms require CSRF tokens. Password checks are serialized to protect a small CPU from parallel bcrypt requests, and the response never reveals whether the username or password was wrong.
 
@@ -681,7 +681,7 @@ sudo rpctl wg peer show orange-pi-2
 sudo rpctl wg peer delete orange-pi-2
 ```
 
-The terminal menu exposes the same actions under item `13. WireGuard peers`. The Web Panel can create peers, download each `.conf` file, display a scannable QR code, and delete peers. A downloaded configuration or displayed QR code contains a private key and must be protected like a password. Deleting a peer removes it from the live interface and invalidates its client configuration immediately.
+The terminal menu exposes the same actions under item `13. WireGuard peers`. The **WireGuard peers - Add a device** section in the Web Panel can create peers, download each `.conf` file, open one peer's QR code in a popup, and delete peers. It also explains the device name, assigned VPN address, configuration download, and mobile QR workflow below the peer table. QR codes stay hidden until **View QR** is selected, which keeps other peer codes out of the scanner view. A downloaded configuration or displayed QR code contains a private key and must be protected like a password. Deleting a peer removes it from the live interface and invalidates its client configuration immediately.
 
 ### Windows, iPhone, iPad, and Android clients
 
@@ -693,7 +693,7 @@ sudo rpctl wg peer add iphone-nam
 sudo rpctl wg peer add android-phone
 ```
 
-Download each named `.conf` file from the Web Panel and import it into the matching WireGuard application. On Windows, select **Import tunnel(s) from file** and activate the tunnel. On iPhone, iPad, or Android, open **WireGuard peers** in the Web Panel and scan that device's QR code from the official WireGuard application. Create a separate peer for every device and never scan the same peer into multiple devices.
+Download each named `.conf` file from the Web Panel and import it into the matching WireGuard application. On Windows, select **Import tunnel(s) from file** and activate the tunnel. On iPhone, iPad, or Android, open **WireGuard peers - Add a device** in the Web Panel, select **View QR** for that device, and scan the code in the popup with the official WireGuard application. Create a separate peer for every device and never scan the same peer into multiple devices.
 
 Test Windows from PowerShell:
 

@@ -515,10 +515,16 @@ func TestDashboardSSLControlsAndResponsiveAssets(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := rendered.String()
-	for _, expected := range []string{"/ssl/issue", "/ssl/renew", "Issue certificate", "Renew certificate", "45 days", "Expires 2026-11-16", "12 days", "class=\"proxy-table\"", "class=\"ssl-content\"", "class=\"actions-content\"", "Reverse Proxy &amp; VPN Tunnel", "Configuration Guide", "https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel", "rpctl vtest", "Nam Hoàng", "203.0.113.1", "10.77.0.1", "1 vCPU", "128 / 512 MB used", "1.0 GB", "5.0 / 20.0 GB used", "Webpanel Dashboard", "http://203.0.113.1:9080", "/system/nginx-restart", "/system/update", "/system/reboot", "/wireguard/peer/add", "/wireguard/peer/download", "/wireguard/peer/qr?peer=client2", "/wireguard/peer/delete", "client2", "10.77.0.3/32", "/static/favicon.svg"} {
+	for _, expected := range []string{"/ssl/issue", "/ssl/renew", "Issue certificate", "Renew certificate", "45 days", "Expires 2026-11-16", "12 days", "class=\"proxy-table\"", "class=\"ssl-content\"", "class=\"actions-content\"", "Reverse Proxy &amp; VPN Tunnel", "Configuration Guide", "https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel", "rpctl vtest", "Nam Hoàng", "203.0.113.1", "10.77.0.1", "1 vCPU", "128 / 512 MB used", "1.0 GB", "5.0 / 20.0 GB used", "Webpanel Dashboard", "http://203.0.113.1:9080", "/system/nginx-restart", "/system/update", "/system/reboot", "/wireguard/peer/add", "/wireguard/peer/download", "/wireguard/peer/delete", "WireGuard peers - Add a device", "the name of the newly added device", "the private VPN IP address that VPS-1 assigns", "Setup guide", "Use the QR code to connect a mobile device quickly", "shop.example.com", "10.10.0.25:80", "10.10.0.212:3000", "the public hostname that visitors use", "The website or application must already be running", "use the <strong>Reverse proxies</strong> section", "data-qr-peer=\"client2\"", "View QR", "wireguard-qr-dialog", "/static/app.js", "client2", "10.77.0.3/32", "/static/favicon.svg"} {
 		if !strings.Contains(html, expected) {
 			t.Errorf("dashboard is missing %q", expected)
 		}
+	}
+	if strings.Contains(html, "/wireguard/peer/qr?peer=client2") {
+		t.Fatal("dashboard eagerly loads a peer QR code")
+	}
+	if strings.Index(html, "<th>QR</th>") > strings.Index(html, "<th>Client configuration</th>") {
+		t.Fatal("QR column must appear before Client configuration")
 	}
 	if strings.Contains(html, ">Days<") || strings.Contains(html, ">enabled</span>") {
 		t.Fatal("dashboard still renders a separate Days column or redundant SSL enabled label")
@@ -527,9 +533,18 @@ func TestDashboardSSLControlsAndResponsiveAssets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"max-width: 1680px", "@media (max-width: 760px)", ".proxy-table { min-width: 1040px; }", "width: clamp(170px, 18vw, 260px)", "flex-wrap: nowrap", "height: 2.6rem"} {
+	for _, expected := range []string{"max-width: 1680px", "@media (max-width: 760px)", ".proxy-table { min-width: 1040px; }", ".peer-table { min-width: 860px; table-layout: fixed; }", ".peer-config-column { width: 34%; }", ".qr-dialog::backdrop", "width: clamp(170px, 18vw, 260px)", "flex-wrap: nowrap", "height: 2.6rem"} {
 		if !strings.Contains(string(css), expected) {
 			t.Errorf("responsive stylesheet is missing %q", expected)
+		}
+	}
+	javascript, err := fs.ReadFile(webassets.Files, "static/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"encodeURIComponent(peer)", "/wireguard/peer/qr?peer=", "dialog.showModal()", "image.removeAttribute(\"src\")"} {
+		if !strings.Contains(string(javascript), expected) {
+			t.Errorf("QR dialog script is missing %q", expected)
 		}
 	}
 	favicon, err := fs.ReadFile(webassets.Files, "static/favicon.svg")

@@ -97,7 +97,7 @@ sudo rpctl ssl status shop.example.com</code></pre>
     <section>
       <h2>Add VPS-3 Through VPS-N</h2>
       <h3>1. Create One Peer for the New Server</h3>
-      <p>On VPS-1, use Dashboard → <strong>WireGuard peers</strong> → <strong>Create peer</strong>, terminal menu item 13, or this command:</p>
+      <p>On VPS-1, use Dashboard → <strong>WireGuard peers - Add a device</strong> → <strong>Create peer</strong>, terminal menu item 13, or this command:</p>
       <pre><code>sudo rpctl wg peer add
 sudo rpctl wg peer list</code></pre>
       <p>The first additional peer is normally <code>client2</code> with <code>10.10.0.3/32</code>. Download it from Dashboard or copy this file:</p>
@@ -144,7 +144,7 @@ curl -I -H 'Host: api.example.com' http://10.10.0.3:80</code></pre>
       <ol>
         <li>Install the official WireGuard app from the Apple App Store or Google Play through <a href="https://www.wireguard.com/install/" target="_blank" rel="noopener noreferrer">wireguard.com/install</a>.</li>
         <li>Create a separate peer for each device, such as <code>iphone-nam</code> or <code>android-phone</code>.</li>
-        <li>In the WireGuard app, add a tunnel from a QR code and scan the QR shown in that peer's Dashboard row. You can alternatively download and import the peer's <code>.conf</code> file.</li>
+        <li>In the WireGuard app, add a tunnel from a QR code. On the Dashboard, select <strong>View QR</strong> for that peer and scan the code in the popup. You can alternatively download and import the peer's <code>.conf</code> file.</li>
         <li>Activate the tunnel, then check <code>sudo wg show</code> on VPS-1 for a recent handshake.</li>
         <li>Open a known private website or service through its <code>10.10.0.x</code> address to test access.</li>
       </ol>
