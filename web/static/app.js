@@ -57,28 +57,50 @@
     const banner = document.querySelector("#update-banner");
     const version = document.querySelector("#update-version");
     const dismiss = document.querySelector("#update-dismiss");
-    if (!banner || !version || !dismiss) {
+    const versionCheck = document.querySelector("#version-check");
+    const versionCheckStatus = document.querySelector("#version-check-status");
+    if (!banner || !version || !dismiss || !versionCheck || !versionCheckStatus) {
       return;
     }
 
     const storageKey = "rpctl-update-dismissed";
     const currentSession = banner.dataset.session || "session";
-    const refresh = async (showAfterCheck) => {
+    const setCheckStatus = (message, state = "") => {
+      versionCheckStatus.textContent = message;
+      if (state) {
+        versionCheckStatus.dataset.state = state;
+      } else {
+        delete versionCheckStatus.dataset.state;
+      }
+    };
+    const refresh = async ({ showAfterCheck = false, force = false, announce = false } = {}) => {
+      if (announce) {
+        versionCheck.disabled = true;
+        versionCheck.setAttribute("aria-busy", "true");
+        setCheckStatus("Checking for updates...");
+      }
       try {
-        const response = await fetch("/system/update-status", {
+        const endpoint = force ? "/system/update-status?refresh=1" : "/system/update-status";
+        const response = await fetch(endpoint, {
           credentials: "same-origin",
           headers: { Accept: "application/json" },
           cache: "no-store",
         });
         if (!response.ok) {
-          return;
+          throw new Error(`HTTP ${response.status}`);
         }
         const update = await response.json();
         if (!update.available || !update.latest) {
           banner.hidden = true;
+          if (announce) {
+            setCheckStatus(`${versionCheck.dataset.version} is up to date.`, "current");
+          }
           return;
         }
         version.textContent = update.latest;
+        if (announce) {
+          setCheckStatus(`New version ${update.latest} is available.`, "available");
+        }
         let dismissed = null;
         try {
           dismissed = JSON.parse(sessionStorage.getItem(storageKey));
@@ -95,7 +117,15 @@
           banner.hidden = false;
         }
       } catch (_) {
+        if (announce) {
+          setCheckStatus("Update check failed. Try again.", "error");
+        }
         // Keep the dashboard usable when GitHub or the network is unavailable.
+      } finally {
+        if (announce) {
+          versionCheck.disabled = false;
+          versionCheck.removeAttribute("aria-busy");
+        }
       }
     };
 
@@ -108,8 +138,12 @@
       banner.hidden = true;
     });
 
-    void refresh(false);
-    window.setInterval(() => void refresh(true), 60 * 60 * 1000);
+    versionCheck.addEventListener("click", () => {
+      void refresh({ showAfterCheck: true, force: true, announce: true });
+    });
+
+    void refresh();
+    window.setInterval(() => void refresh({ showAfterCheck: true, force: true }), 60 * 60 * 1000);
   };
 
   setupWireGuardQR();

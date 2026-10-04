@@ -228,7 +228,11 @@
       </div>
     </section>
   </main>
-  <footer><strong>rpctl v{{.Version}}</strong><span aria-hidden="true">&copy;</span><span>by <a href="https://hoanggiangnam.com" target="_blank" rel="noopener noreferrer">Nam Hoàng</a></span></footer>
+  <footer>
+    <button type="button" class="version-check" id="version-check" data-version="v{{.Version}}" title="Check for updates">rpctl v{{.Version}}</button>
+    <span class="version-check-status" id="version-check-status" role="status" aria-live="polite"></span>
+    <span aria-hidden="true">&copy;</span><span>by <a href="https://hoanggiangnam.com" target="_blank" rel="noopener noreferrer">Nam Hoàng</a></span>
+  </footer>
 </body>
 </html>
 {{end}}

@@ -604,7 +604,8 @@ func (s *Server) systemUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) systemUpdateStatus(w http.ResponseWriter, r *http.Request) {
-	status, err := s.latestUpdateStatus(r.Context())
+	force := r.URL.Query().Get("refresh") == "1"
+	status, err := s.latestUpdateStatus(r.Context(), force)
 	if err != nil {
 		http.Error(w, "update check is temporarily unavailable", http.StatusServiceUnavailable)
 		return
@@ -615,10 +616,10 @@ func (s *Server) systemUpdateStatus(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) latestUpdateStatus(ctx context.Context) (updater.Status, error) {
+func (s *Server) latestUpdateStatus(ctx context.Context, force bool) (updater.Status, error) {
 	s.updateMu.Lock()
 	defer s.updateMu.Unlock()
-	if !s.updateTime.IsZero() && time.Since(s.updateTime) < time.Hour {
+	if !force && !s.updateTime.IsZero() && time.Since(s.updateTime) < time.Hour {
 		return s.updateInfo, errorFromMessage(s.updateErr)
 	}
 	checkContext, cancel := context.WithTimeout(ctx, 45*time.Second)
@@ -635,14 +636,11 @@ func (s *Server) latestUpdateStatus(ctx context.Context) (updater.Status, error)
 }
 
 func (s *Server) updateCheckLoop() {
-	_, _ = s.latestUpdateStatus(context.Background())
+	_, _ = s.latestUpdateStatus(context.Background(), false)
 	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()
 	for range ticker.C {
-		s.updateMu.Lock()
-		s.updateTime = time.Time{}
-		s.updateMu.Unlock()
-		_, _ = s.latestUpdateStatus(context.Background())
+		_, _ = s.latestUpdateStatus(context.Background(), true)
 	}
 }
 

@@ -4,7 +4,7 @@
 
 ### 1. VPS-1 — Reverse Proxy
 
-This v1.0.8 installer supports **Ubuntu Server 22.04 LTS and 24.04 LTS** on `amd64` and `arm64`. Run this command on a clean VPS:
+This v1.0.9 installer supports **Ubuntu Server 22.04 LTS and 24.04 LTS** on `amd64` and `arm64`. Run this command on a clean VPS:
 
 ```bash
 sudo apt update && sudo apt install -y ca-certificates curl git && git clone https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel.git rpctl && cd rpctl && sudo bash scripts/install.sh
@@ -19,7 +19,7 @@ grep -n 'ubuntu:22.04' scripts/install.sh
 sudo bash scripts/install.sh
 ```
 
-The `grep` command must show `ubuntu:22.04|ubuntu:24.04`. The installer then downloads the latest GitHub Release, so the repository owner must publish the v1.0.8 release assets before this installation is used.
+The `grep` command must show `ubuntu:22.04|ubuntu:24.04`. The installer then downloads the latest GitHub Release, so the repository owner must publish the v1.0.9 release assets before this installation is used.
 
 The installer first asks for a VPN backend:
 
@@ -709,7 +709,7 @@ When UFW is active, rpctl adds port `9080/tcp` only while direct access is enabl
 
 The panel provides the VPS and VPN addresses, CPU, RAM, swap, SSD and uptime summaries, managed proxy CRUD, per-domain SSL controls, controlled Nginx restart and VPS reboot actions, and an authenticated **Configuration Guide**. In WireGuard mode it provides peer creation/deletion, configuration downloads and QR codes. In Tailscale mode it displays the local identity, tailnet and device status returned by `tailscale status --json`, with a link to the Tailscale Admin Console for device approval and policy management.
 
-The Web Panel checks the latest GitHub Release when it starts and every 60 minutes. When a newer version is available, a dismissible notification appears at the top of the Dashboard with an **Update now!** action. Dismissing it hides the notification for the current login session; a new login or the next hourly check can display it again. The previous permanent update button is removed. Updates continue to verify `SHA256SUMS` before replacing the binary.
+The Web Panel checks the latest GitHub Release when it starts and every 60 minutes. Click the `rpctl vX.Y.Z` version in the Dashboard footer to run an immediate AJAX update check without reloading the page. The footer reports whether the installed version is current, whether a newer release is available, or whether the check failed. When a newer version is available, a dismissible notification appears at the top of the Dashboard with an **Update now!** action. Dismissing it hides the notification for the current login session; a new login, an hourly check, or a manual footer check can display it again. Updates continue to verify `SHA256SUMS` before replacing the binary.
 
 The Add proxy section changes its examples to match the selected VPN backend and explains the domain, upstream address, connectivity requirement, and next SSL step. The guide is available at `/guide` and displays either WireGuard or Tailscale instructions. The header includes the project GitHub link beside Sign out. The footer reads the running version directly from the compiled binary. The layout expands on desktop and changes tables into mobile cards on narrow screens. Its red-lock favicon, HTML, CSS, and JavaScript are embedded in the same binary. It does not install Node.js, PHP, a database, or another binary.
 

@@ -578,7 +578,7 @@ func TestDashboardTailscaleModeAndUpdateNotification(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := rendered.String()
-	for _, expected := range []string{"Tailscale network", "example.com", "100.64.0.1", "iphone", "100.64.0.2", "Open Admin Console", "update-banner", "Update now!"} {
+	for _, expected := range []string{"Tailscale network", "example.com", "100.64.0.1", "iphone", "100.64.0.2", "Open Admin Console", "update-banner", "Update now!", "id=\"version-check\"", "title=\"Check for updates\"", "id=\"version-check-status\""} {
 		if !strings.Contains(html, expected) {
 			t.Errorf("Tailscale dashboard is missing %q", expected)
 		}
@@ -592,7 +592,7 @@ func TestDashboardTailscaleModeAndUpdateNotification(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"/system/update-status", "60 * 60 * 1000", "sessionStorage", "checked_at"} {
+	for _, expected := range []string{"/system/update-status", "/system/update-status?refresh=1", "60 * 60 * 1000", "sessionStorage", "checked_at", "Checking for updates...", "is up to date.", "Update check failed. Try again.", `versionCheck.addEventListener("click"`} {
 		if !strings.Contains(string(javascript), expected) {
 			t.Errorf("update notification script is missing %q", expected)
 		}
