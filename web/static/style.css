@@ -105,7 +105,7 @@ td:first-child { font-weight: 650; }
 .peer-config-cell code { white-space: normal; overflow-wrap: anywhere; }
 .peer-actions { justify-content: flex-start; flex-wrap: wrap; }
 .peer-delete-confirm > div { right: 0; }
-.peer-help, .proxy-help { color: #6e7681; font-size: 8px; text-align: left; }
+.peer-help, .proxy-help { color: #6e7681; font-size: 11px; text-align: left; }
 .peer-help { margin-top: .9rem; padding-top: .9rem; border-top: 1px solid #30363d; }
 .peer-help ul, .proxy-help ul { display: block; margin: 0; padding-left: 1.25rem; }
 .peer-help li, .proxy-help li { margin: .25rem 0; line-height: 1.5; }

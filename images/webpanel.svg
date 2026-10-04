@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1220" viewBox="0 0 1440 1220" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1238" viewBox="0 0 1440 1238" role="img" aria-labelledby="title desc">
   <title id="title">rpctl Web Panel dashboard</title>
   <desc id="desc">Preview of the lightweight reverse proxy and WireGuard dashboard.</desc>
-  <rect width="1440" height="1220" fill="#0d1117"/>
+  <rect width="1440" height="1238" fill="#0d1117"/>
   <rect width="1440" height="72" fill="#161b22"/>
   <path d="M0 71.5h1440" stroke="#30363d"/>
   <g font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
@@ -28,7 +28,7 @@
         <text x="16" y="54" fill="#e6edf3" font-size="18" font-weight="700">203.0.113.10 (eth0)</text>
         <rect x="454" width="430" height="78" rx="8" fill="#0d1117"/>
         <text x="470" y="26" fill="#8b949e" font-size="13">VPN IP</text>
-        <text x="470" y="54" fill="#e6edf3" font-size="18" font-weight="700">10.10.0.1 (wg0)</text>
+        <text x="470" y="54" fill="#e6edf3" font-size="18" font-weight="700">10.10.10.1 (wg0)</text>
         <rect x="908" width="432" height="78" rx="8" fill="#0d1117"/>
         <text x="924" y="26" fill="#8b949e" font-size="13">UPTIME</text>
         <text x="924" y="54" fill="#e6edf3" font-size="18" font-weight="700">12d 4h 32m</text>
@@ -41,7 +41,7 @@
     </g>
 
     <g transform="translate(28 356)">
-      <rect width="1384" height="256" rx="10" fill="#161b22" stroke="#30363d"/>
+      <rect width="1384" height="275" rx="10" fill="#161b22" stroke="#30363d"/>
       <text x="22" y="38" fill="#f0f6fc" font-size="22" font-weight="700">WireGuard peers - Add a device</text>
       <rect x="22" y="56" width="344" height="42" rx="6" fill="#0d1117" stroke="#484f58"/>
       <text x="38" y="82" fill="#8b949e" font-size="14">client2</text>
@@ -54,21 +54,21 @@
       <text x="700" y="145" fill="#8b949e" font-size="12" font-weight="700">CLIENT CONFIGURATION</text>
       <text x="1120" y="145" fill="#8b949e" font-size="12" font-weight="700">ACTIONS</text>
       <text x="34" y="182" fill="#e6edf3" font-size="14" font-weight="650">client1</text>
-      <text x="310" y="182" fill="#e6edf3" font-size="14">10.10.0.2/32</text>
+      <text x="310" y="182" fill="#e6edf3" font-size="14">10.10.10.2/32</text>
       <text x="570" y="182" fill="#58a6ff" font-size="14" font-weight="650" text-decoration="underline">View QR</text>
       <text x="700" y="182" fill="#e6edf3" font-size="14">/etc/rpctl/wireguard/peers/client1.conf</text>
       <rect x="1120" y="164" width="88" height="30" rx="6" fill="#30363d"/><text x="1164" y="184" fill="#fff" font-size="13" text-anchor="middle">Download</text>
       <rect x="1218" y="164" width="72" height="30" rx="6" fill="#da3633"/><text x="1254" y="184" fill="#fff" font-size="13" text-anchor="middle">Delete</text>
       <path d="M22 205h1340" stroke="#30363d"/>
-      <g fill="#6e7681" font-size="8">
+      <g fill="#6e7681" font-size="11">
         <text x="34" y="218">• Name: the name of the newly added device.</text>
-        <text x="34" y="229">• VPN address: the private VPN IP assigned by VPS-1.</text>
-        <text x="34" y="240">• Download the peer configuration file to connect the device to VPS-1.</text>
-        <text x="34" y="251">• Use the QR code to connect a mobile device quickly.</text>
+        <text x="34" y="233">• VPN address: the private VPN IP assigned by VPS-1.</text>
+        <text x="34" y="248">• Download the peer configuration file to connect the device to VPS-1.</text>
+        <text x="34" y="263">• Use the QR code to connect a mobile device quickly.</text>
       </g>
     </g>
 
-    <g transform="translate(28 632)">
+    <g transform="translate(28 650)">
       <rect width="1384" height="230" rx="10" fill="#161b22" stroke="#30363d"/>
       <text x="22" y="38" fill="#f0f6fc" font-size="22" font-weight="700">Add proxy</text>
       <text x="22" y="68" fill="#c9d1d9" font-size="13" font-weight="650">DOMAIN</text>
@@ -76,20 +76,20 @@
       <text x="38" y="104" fill="#8b949e" font-size="14">shop.example.com</text>
       <text x="440" y="68" fill="#c9d1d9" font-size="13" font-weight="650">UPSTREAM</text>
       <rect x="440" y="78" width="600" height="42" rx="6" fill="#0d1117" stroke="#484f58"/>
-      <text x="456" y="104" fill="#8b949e" font-size="14">http://10.10.0.25:80</text>
+      <text x="456" y="104" fill="#8b949e" font-size="14">http://10.10.10.25:80</text>
       <rect x="1052" y="78" width="72" height="42" rx="6" fill="#238636"/>
       <text x="1088" y="104" fill="#fff" font-size="14" font-weight="700" text-anchor="middle">Add</text>
       <path d="M22 140h1340" stroke="#30363d"/>
-      <text x="34" y="158" fill="#6e7681" font-size="8"><tspan font-weight="700">Ex:</tspan> shop.example.com → VPS-1(10.10.0.1) → WireGuard → VPS-2 Webserver(http://10.10.0.25:80)</text>
-      <g fill="#6e7681" font-size="8">
+      <text x="34" y="158" fill="#6e7681" font-size="11"><tspan font-weight="700">Ex:</tspan> shop.example.com → VPS-1(10.10.10.1) → WireGuard → VPS-2 Webserver(http://10.10.10.25:80)</text>
+      <g fill="#6e7681" font-size="11">
         <text x="34" y="174">• Domain: the public hostname used to access the website or application.</text>
-        <text x="34" y="185">• Upstream: the HTTP address that receives requests from VPS-1.</text>
-        <text x="34" y="196">• The upstream service must be running and reachable from VPS-1.</text>
-        <text x="34" y="207">• Add the proxy, then issue SSL from Reverse proxies.</text>
+        <text x="34" y="189">• Upstream: the HTTP address that receives requests from VPS-1.</text>
+        <text x="34" y="204">• The upstream service must be running and reachable from VPS-1.</text>
+        <text x="34" y="219">• Add the proxy, then issue SSL from Reverse proxies.</text>
       </g>
     </g>
 
-    <g transform="translate(28 882)">
+    <g transform="translate(28 900)">
       <rect width="1384" height="300" rx="10" fill="#161b22" stroke="#30363d"/>
       <text x="22" y="38" fill="#f0f6fc" font-size="22" font-weight="700">Reverse proxies</text>
       <text x="22" y="65" fill="#8b949e" font-size="14">Certificate time remaining and automatic renewal status</text>
@@ -100,8 +100,8 @@
       <text x="790" y="118" fill="#8b949e" font-size="12" font-weight="700">SSL</text>
       <text x="1020" y="118" fill="#8b949e" font-size="12" font-weight="700">ACTIONS</text>
       <g fill="#e6edf3" font-size="14">
-        <text x="34" y="166" font-weight="650">shop.example.com</text><text x="310" y="166">http://10.10.0.2:80</text><text x="650" y="166">enabled</text><text x="790" y="158" fill="#3fb950" font-weight="700">87 days</text><text x="790" y="177" fill="#8b949e" font-size="12">Expires 2027-01-01</text>
-        <text x="34" y="222" font-weight="650">api.example.com</text><text x="310" y="222">http://10.10.0.3:80</text><text x="650" y="222">enabled</text><text x="790" y="222" fill="#d29922" font-weight="700">21 days</text>
+        <text x="34" y="166" font-weight="650">shop.example.com</text><text x="310" y="166">http://10.10.10.2:80</text><text x="650" y="166">enabled</text><text x="790" y="158" fill="#3fb950" font-weight="700">87 days</text><text x="790" y="177" fill="#8b949e" font-size="12">Expires 2027-01-01</text>
+        <text x="34" y="222" font-weight="650">api.example.com</text><text x="310" y="222">http://10.10.10.3:80</text><text x="650" y="222">enabled</text><text x="790" y="222" fill="#d29922" font-weight="700">21 days</text>
         <text x="34" y="278" font-weight="650">panel.example.com</text><text x="310" y="278">http://127.0.0.1:9080</text><text x="650" y="278">enabled</text><text x="790" y="278" fill="#3fb950" font-weight="700">89 days</text>
       </g>
       <g fill="#30363d">
@@ -115,6 +115,6 @@
         <text x="1108" y="275" fill="#c9d1d9">Webpanel Dashboard</text>
       </g>
     </g>
-    <text x="720" y="1212" fill="#8b949e" font-size="13" text-anchor="middle">rpctl · Lightweight Reverse Proxy &amp; WireGuard Manager</text>
+    <text x="720" y="1230" fill="#8b949e" font-size="13" text-anchor="middle">rpctl · Lightweight Reverse Proxy &amp; WireGuard Manager</text>
   </g>
 </svg>

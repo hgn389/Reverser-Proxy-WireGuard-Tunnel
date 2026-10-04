@@ -21,9 +21,9 @@
     <section>
       <h1>Configuration Guide</h1>
       <p>VPS-1 is the public reverse proxy. VPS-2 through VPS-N run websites or private services. Each server or device that joins WireGuard must use its own peer configuration.</p>
-      <pre>Internet → VPS-1 (rpctl, Nginx, SSL, WireGuard 10.10.0.1)
+      <pre>Internet → VPS-1 (rpctl, Nginx, SSL, WireGuard 10.10.10.1)
                     ↓ encrypted WireGuard tunnel
-          VPS-2 10.10.0.2 · VPS-3 10.10.0.3 · VPS-N</pre>
+          VPS-2 10.10.10.2 · VPS-3 10.10.10.3 · VPS-N</pre>
       <div class="guide-note"><strong>Keep every client configuration private.</strong> It contains a WireGuard private key. Never reuse one configuration on two devices.</div>
     </section>
 
@@ -35,7 +35,7 @@ sudo apt install -y git
 git clone https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel.git rpctl
 cd rpctl
 sudo bash scripts/install.sh</code></pre>
-      <p>Select <strong>WireGuard private mode</strong> and <strong>acme.sh</strong>. The installer creates VPS-1 as <code>10.10.0.1</code> and the first client as <code>10.10.0.2</code>.</p>
+      <p>Select <strong>WireGuard private mode</strong>, choose the default <code>10.10.10.0/24</code> subnet, and select <strong>acme.sh</strong>. The installer creates VPS-1 as <code>10.10.10.1</code> and the first client as <code>10.10.10.2</code>. For independent rpctl servers, select a different private subnet for each installation, such as <code>10.20.0.0/24</code> and <code>10.30.0.0/24</code>.</p>
       <pre><code>sudo rpctl status
 sudo rpctl wg peer list
 sudo rp</code></pre>
@@ -63,20 +63,20 @@ sudo rm -f /root/client1.conf</code></pre>
       <p>Verify the interface and tunnel on VPS-2:</p>
       <pre><code>ip address show wg0
 sudo wg show
-ping -c 4 10.10.0.1</code></pre>
+ping -c 4 10.10.10.1</code></pre>
       <p>Verify VPS-2 from VPS-1:</p>
-      <pre><code>ping -c 4 10.10.0.2
+      <pre><code>ping -c 4 10.10.10.2
 sudo wg show</code></pre>
       <p>A recent handshake and successful pings mean the tunnel is ready.</p>
     </section>
 
     <section>
       <h2>Step 4 — Prepare the Website on VPS-2</h2>
-      <p>Create the website in aaPanel or your web server using its real domain, for example <code>shop.example.com</code>. The web server must listen on <code>10.10.0.2:80</code> or <code>0.0.0.0:80</code>.</p>
+      <p>Create the website in aaPanel or your web server using its real domain, for example <code>shop.example.com</code>. The web server must listen on <code>10.10.10.2:80</code> or <code>0.0.0.0:80</code>.</p>
       <p>If UFW is active on VPS-2, allow VPS-1 to reach the website through WireGuard:</p>
-      <pre><code>sudo ufw allow in on wg0 from 10.10.0.1 to any port 80 proto tcp</code></pre>
+      <pre><code>sudo ufw allow in on wg0 from 10.10.10.1 to any port 80 proto tcp</code></pre>
       <p>Test the website from VPS-1 before creating the reverse proxy:</p>
-      <pre><code>curl -I -H 'Host: shop.example.com' http://10.10.0.2:80</code></pre>
+      <pre><code>curl -I -H 'Host: shop.example.com' http://10.10.10.2:80</code></pre>
       <p>The response should normally be HTTP 200, 301, or 302. Public SSL is installed on VPS-1; the private HTTP hop is already encrypted by WireGuard.</p>
     </section>
 
@@ -85,7 +85,7 @@ sudo wg show</code></pre>
       <ol>
         <li>Create an A record for <code>shop.example.com</code> pointing to the public IPv4 address of VPS-1.</li>
         <li>Open Dashboard and enter the domain and complete upstream URL.</li>
-        <li>Use <code>http://10.10.0.2:80</code> as the upstream.</li>
+        <li>Use <code>http://10.10.10.2:80</code> as the upstream.</li>
         <li>After DNS reaches VPS-1, select <strong>Issue SSL</strong>.</li>
         <li>When Cloudflare is used, select <strong>Full (Strict)</strong> after the VPS-1 certificate is active.</li>
       </ol>
@@ -100,7 +100,7 @@ sudo rpctl ssl status shop.example.com</code></pre>
       <p>On VPS-1, use Dashboard → <strong>WireGuard peers - Add a device</strong> → <strong>Create peer</strong>, terminal menu item 13, or this command:</p>
       <pre><code>sudo rpctl wg peer add
 sudo rpctl wg peer list</code></pre>
-      <p>The first additional peer is normally <code>client2</code> with <code>10.10.0.3/32</code>. Download it from Dashboard or copy this file:</p>
+      <p>The first additional peer is normally <code>client2</code> with <code>10.10.10.3/32</code>. Download it from Dashboard or copy this file:</p>
       <pre><code>/etc/rpctl/wireguard/peers/client2.conf</code></pre>
 
       <h3>2. Install It on VPS-3</h3>
@@ -113,16 +113,16 @@ sudo systemctl enable --now wg-quick@wg0
 sudo rm -f /root/client2.conf
 ip address show wg0
 sudo wg show
-ping -c 4 10.10.0.1</code></pre>
+ping -c 4 10.10.10.1</code></pre>
 
       <h3>3. Test from VPS-1 and Add the Website</h3>
-      <pre><code>ping -c 4 10.10.0.3
-curl -I -H 'Host: api.example.com' http://10.10.0.3:80</code></pre>
-      <p>Use <code>http://10.10.0.3:80</code> as the upstream. Repeat these steps once per additional server. Deleted addresses may be reused, so always check <code>rpctl wg peer list</code> instead of guessing an address.</p>
+      <pre><code>ping -c 4 10.10.10.3
+curl -I -H 'Host: api.example.com' http://10.10.10.3:80</code></pre>
+      <p>Use <code>http://10.10.10.3:80</code> as the upstream. Repeat these steps once per additional server. Deleted addresses may be reused, so always check <code>rpctl wg peer list</code> instead of guessing an address.</p>
       <div class="example-grid">
-        <div><strong>VPS-2 · client1</strong><code>10.10.0.2</code></div>
-        <div><strong>VPS-3 · client2</strong><code>10.10.0.3</code></div>
-        <div><strong>VPS-4 · client3</strong><code>10.10.0.4</code></div>
+        <div><strong>VPS-2 · client1</strong><code>10.10.10.2</code></div>
+        <div><strong>VPS-3 · client2</strong><code>10.10.10.3</code></div>
+        <div><strong>VPS-4 · client3</strong><code>10.10.10.4</code></div>
       </div>
     </section>
 
@@ -134,7 +134,7 @@ curl -I -H 'Host: api.example.com' http://10.10.0.3:80</code></pre>
         <li>Download <code>windows-laptop.conf</code> from Dashboard.</li>
         <li>Open WireGuard on Windows and select <strong>Import tunnel(s) from file</strong>.</li>
         <li>Select the downloaded file and activate the tunnel.</li>
-        <li>Open PowerShell and run <code>ping 10.10.0.1</code>.</li>
+        <li>Open PowerShell and run <code>ping 10.10.10.1</code>.</li>
       </ol>
       <p>On VPS-1, run <code>sudo wg show</code> and confirm that the Windows peer has a recent handshake.</p>
     </section>
@@ -146,10 +146,10 @@ curl -I -H 'Host: api.example.com' http://10.10.0.3:80</code></pre>
         <li>Create a separate peer for each device, such as <code>iphone-nam</code> or <code>android-phone</code>.</li>
         <li>In the WireGuard app, add a tunnel from a QR code. On the Dashboard, select <strong>View QR</strong> for that peer and scan the code in the popup. You can alternatively download and import the peer's <code>.conf</code> file.</li>
         <li>Activate the tunnel, then check <code>sudo wg show</code> on VPS-1 for a recent handshake.</li>
-        <li>Open a known private website or service through its <code>10.10.0.x</code> address to test access.</li>
+        <li>Open a known private website or service through its <code>10.10.10.x</code> address to test access.</li>
       </ol>
       <p>The QR code and downloaded configuration both contain the peer's private key. Do not capture, share, or reuse either one on another device. Delete downloaded configuration files after importing them.</p>
-      <p>Private mode routes only <code>10.10.0.0/24</code> through WireGuard, so normal Internet traffic continues to use the device's regular connection.</p>
+      <p>Private mode routes only <code>10.10.10.0/24</code> through WireGuard, so normal Internet traffic continues to use the device's regular connection.</p>
     </section>
 
     <section>

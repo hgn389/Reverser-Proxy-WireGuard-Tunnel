@@ -112,14 +112,14 @@
       <form class="inline-form" method="post" action="/proxy/add">
         <input type="hidden" name="csrf" value="{{.CSRF}}">
         <label>Domain<input name="domain" placeholder="app.example.com" required></label>
-        <label>Upstream<input name="upstream" placeholder="http://10.10.0.2:80" required></label>
+        <label>Upstream<input name="upstream" placeholder="http://10.10.10.2:80" required></label>
         <button type="submit">Add</button>
       </form>
       <div class="proxy-help">
-        <p><strong>Ex:</strong> <code>shop.example.com</code> &rarr; VPS-1(<code>10.10.0.1</code>) &rarr; WireGuard &rarr; VPS-2 Webserver(<code>http://10.10.0.25:80</code>)</p>
+        <p><strong>Ex:</strong> <code>shop.example.com</code> &rarr; VPS-1(<code>10.10.10.1</code>) &rarr; WireGuard &rarr; VPS-2 Webserver(<code>http://10.10.10.25:80</code>)</p>
         <ul>
           <li><strong>Domain:</strong> the public hostname that visitors use to access your website or application.</li>
-          <li><strong>Upstream:</strong> the HTTP address of the web server that VPS-1 forwards requests to, such as <code>http://10.10.0.25:80</code> or <code>http://10.10.0.212:3000</code>.</li>
+          <li><strong>Upstream:</strong> the HTTP address of the web server that VPS-1 forwards requests to, such as <code>http://10.10.10.25:80</code> or <code>http://10.10.10.212:3000</code>.</li>
           <li>The website or application must already be running on the upstream device, and VPS-1 must be able to reach its address.</li>
           <li>After adding the proxy, use the <strong>Reverse proxies</strong> section to issue an SSL certificate for the domain.</li>
         </ul>

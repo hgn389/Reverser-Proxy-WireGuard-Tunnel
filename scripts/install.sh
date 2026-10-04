@@ -18,10 +18,24 @@ acme_option_seen=no
 web_option_seen=no
 firewall_option_seen=no
 
+wg_network_env_set=no
+wg_server_address_env_set=no
+wg_client_address_env_set=no
+[[ -n ${RPCTL_WG_NETWORK+x} ]] && wg_network_env_set=yes
+[[ -n ${RPCTL_WG_SERVER_ADDRESS+x} ]] && wg_server_address_env_set=yes
+[[ -n ${RPCTL_WG_CLIENT_ADDRESS+x} ]] && wg_client_address_env_set=yes
+wg_address_override=no
+if [[ $wg_network_env_set == yes || $wg_server_address_env_set == yes || $wg_client_address_env_set == yes ]]; then
+  wg_address_override=yes
+fi
+
 wg_interface="${RPCTL_WG_INTERFACE:-wg0}"
-wg_server_address="${RPCTL_WG_SERVER_ADDRESS:-10.10.0.1/24}"
-wg_network="${RPCTL_WG_NETWORK:-10.10.0.0/24}"
-wg_client_address="${RPCTL_WG_CLIENT_ADDRESS:-10.10.0.2/32}"
+default_wg_network="10.10.10.0/24"
+default_wg_server_address="10.10.10.1/24"
+default_wg_client_address="10.10.10.2/32"
+wg_server_address="${RPCTL_WG_SERVER_ADDRESS:-$default_wg_server_address}"
+wg_network="${RPCTL_WG_NETWORK:-$default_wg_network}"
+wg_client_address="${RPCTL_WG_CLIENT_ADDRESS:-$default_wg_client_address}"
 wg_port="${RPCTL_WG_PORT:-51820}"
 wg_peer_name="${RPCTL_WG_PEER_NAME:-client1}"
 wg_endpoint="${RPCTL_WG_ENDPOINT:-}"
@@ -80,6 +94,15 @@ ipv4_to_int() {
   printf '%u\n' "$(( (10#${octets[0]} << 24) | (10#${octets[1]} << 16) | (10#${octets[2]} << 8) | 10#${octets[3]} ))"
 }
 
+int_to_ipv4() {
+  local value=$1
+  printf '%d.%d.%d.%d\n' \
+    "$(( (value >> 24) & 255 ))" \
+    "$(( (value >> 16) & 255 ))" \
+    "$(( (value >> 8) & 255 ))" \
+    "$(( value & 255 ))"
+}
+
 cidr_contains() {
   local network=$1 candidate=$2 prefix network_int candidate_int mask
   prefix=${network##*/}
@@ -105,10 +128,113 @@ cidr_is_canonical_network() {
   (( (network_int & mask) == network_int ))
 }
 
+cidrs_overlap() {
+  local left=$1 right=$2
+  cidr_contains "$left" "$right" || cidr_contains "$right" "$left"
+}
+
+network_conflicts_with_routes() {
+  local route_type destination remainder
+  while read -r route_type destination remainder; do
+    case "$route_type" in
+      default) continue ;;
+      local|broadcast|unreachable|prohibit|blackhole|throw) ;;
+      *)
+        destination=$route_type
+        ;;
+    esac
+    if valid_ipv4 "$destination"; then
+      destination="${destination}/32"
+    fi
+    valid_ipv4_cidr "$destination" || continue
+    if cidrs_overlap "$wg_network" "$destination"; then
+      return 0
+    fi
+  done < <(/usr/sbin/ip -4 route show table all)
+  return 1
+}
+
+valid_wireguard_network() {
+  local network=$1 prefix private_network private_prefix
+  valid_ipv4_cidr "$network" || return 1
+  prefix=${network##*/}
+  ((10#$prefix >= 16 && 10#$prefix <= 30)) || return 1
+  cidr_is_canonical_network "$network" || return 1
+  for private_network in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do
+    private_prefix=${private_network##*/}
+    if ((10#$prefix >= 10#$private_prefix)) && cidr_contains "$private_network" "$network"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+derive_wireguard_addresses() {
+  local network_int prefix
+  network_int=$(ipv4_to_int "${wg_network%/*}")
+  prefix=${wg_network##*/}
+  wg_server_address="$(int_to_ipv4 "$((network_int + 1))")/${prefix}"
+  wg_client_address="$(int_to_ipv4 "$((network_int + 2))")/32"
+}
+
+prompt_custom_wireguard_network() {
+  local candidate
+  while true; do
+    printf 'Custom subnet in CIDR notation (for example, 10.79.0.0/24): ' > /dev/tty
+    IFS= read -r candidate < /dev/tty || die 'Could not read terminal input.'
+    if ! valid_wireguard_network "$candidate"; then
+      printf 'Invalid subnet. Use a canonical private IPv4 subnet between /16 and /30, such as 10.79.0.0/24.\n' > /dev/tty
+      continue
+    fi
+    wg_network=$candidate
+    if network_conflicts_with_routes; then
+      printf 'Subnet %s overlaps an existing route. Enter a different private subnet.\n' "$wg_network" > /dev/tty
+      continue
+    fi
+    derive_wireguard_addresses
+    return
+  done
+}
+
+select_wireguard_network() {
+  local answer
+  if [[ $wg_address_override == yes ]]; then
+    if [[ $wg_network_env_set == yes && $wg_server_address_env_set == no && $wg_client_address_env_set == no ]]; then
+      valid_wireguard_network "$wg_network" || die 'RPCTL_WG_NETWORK must be a canonical private IPv4 subnet between /16 and /30.'
+      derive_wireguard_addresses
+    fi
+    return
+  fi
+  if [[ $wireguard_option_seen == yes || $has_tty != yes ]]; then
+    return
+  fi
+
+  printf '\nWireGuard subnet:\n' > /dev/tty
+  printf '  1) Use default subnet: %s\n' "$default_wg_network" > /dev/tty
+  printf '  2) Enter a custom private IPv4 subnet\n' > /dev/tty
+  printf 'Select [1]: ' > /dev/tty
+  IFS= read -r answer < /dev/tty || die 'Could not read terminal input.'
+  case "$answer" in
+    2)
+      prompt_custom_wireguard_network
+      ;;
+    *)
+      wg_network=$default_wg_network
+      wg_server_address=$default_wg_server_address
+      wg_client_address=$default_wg_client_address
+      if network_conflicts_with_routes; then
+        printf 'Default subnet %s overlaps an existing route. Enter a custom subnet instead.\n' "$wg_network" > /dev/tty
+        prompt_custom_wireguard_network
+      fi
+      ;;
+  esac
+  info "WireGuard network: ${wg_network} (server ${wg_server_address}, initial peer ${wg_client_address})"
+}
+
 validate_wireguard_settings() {
   [[ $wg_interface =~ ^[A-Za-z0-9_.-]{1,15}$ ]] || die 'RPCTL_WG_INTERFACE is invalid.'
   valid_ipv4_cidr "$wg_server_address" || die 'RPCTL_WG_SERVER_ADDRESS must be a valid IPv4 CIDR.'
-  valid_ipv4_cidr "$wg_network" || die 'RPCTL_WG_NETWORK must be a valid IPv4 CIDR.'
+  valid_wireguard_network "$wg_network" || die 'RPCTL_WG_NETWORK must be a canonical private IPv4 subnet between /16 and /30.'
   valid_ipv4_cidr "$wg_client_address" || die 'RPCTL_WG_CLIENT_ADDRESS must be a valid IPv4 CIDR.'
   cidr_is_canonical_network "$wg_network" || die 'RPCTL_WG_NETWORK must use the canonical network address.'
   [[ ${wg_server_address##*/} == "${wg_network##*/}" ]] || die 'RPCTL_WG_SERVER_ADDRESS prefix must match RPCTL_WG_NETWORK.'
@@ -158,7 +284,7 @@ configure_wireguard() (
     [[ $public_interface =~ ^[A-Za-z0-9_.-]{1,15}$ ]] || die 'Could not detect the public network interface.'
     [[ -x /usr/sbin/iptables ]] || die 'iptables is required for full-tunnel WireGuard.'
   fi
-  if [[ -n $(/usr/sbin/ip -4 route show "$wg_network") ]]; then
+  if network_conflicts_with_routes; then
     die "WireGuard network ${wg_network} conflicts with an existing route. Override RPCTL_WG_* addresses."
   fi
 
@@ -295,7 +421,8 @@ When UFW is active, --open-firewall allows HTTP, selected optional component por
 and preserves SSH rules. HTTPS is opened when acme.sh is selected.
 Set RPCTL_REPO=owner/repo to select your GitHub repository.
 Set RPCTL_VERSION=vX.Y.Z to install a specific release.
-WireGuard defaults can be overridden with RPCTL_WG_* environment variables.
+Set RPCTL_WG_NETWORK to a canonical private IPv4 CIDR to derive the server and
+initial peer addresses automatically. Advanced RPCTL_WG_* overrides remain available.
 For noninteractive --web, set RPCTL_WEB_USERNAME and RPCTL_WEB_PASSWORD_FILE
 (a regular file with permissions 0600 or stricter). RPCTL_WEB_DOMAIN is optional;
 without it, the panel listens on public port 9080.
@@ -382,6 +509,7 @@ if [[ $wireguard == yes && $wireguard_mode == ask ]]; then
   fi
 fi
 if [[ $wireguard_mode == private || $wireguard_mode == full ]]; then
+  select_wireguard_network
   validate_wireguard_settings
 fi
 if [[ $web == ask ]]; then
