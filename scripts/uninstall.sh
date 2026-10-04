@@ -44,6 +44,7 @@ rm -f -- /etc/systemd/system/rpctl-web.service /etc/systemd/system/rpctl-web-hel
 rm -rf -- /etc/rpctl/web
 rm -rf -- /var/lib/rpctl/web
 rm -f -- /run/rpctl/web-helper.sock
+rm -f -- /run/rpctl/update.lock
 if [[ -f /etc/update-motd.d/99-rpctl && ! -L /etc/update-motd.d/99-rpctl ]] && \
    [[ $(sed -n '2p' /etc/update-motd.d/99-rpctl) == '# Managed by rpctl.' ]]; then
   rm -- /etc/update-motd.d/99-rpctl

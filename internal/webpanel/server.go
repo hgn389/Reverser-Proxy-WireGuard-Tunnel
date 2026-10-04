@@ -22,6 +22,7 @@ import (
 	"syscall"
 	"time"
 
+	qrcode "github.com/skip2/go-qrcode"
 	"golang.org/x/crypto/bcrypt"
 
 	"rpctl/internal/proxy"
@@ -166,7 +167,9 @@ func (s *Server) Handler() (http.Handler, error) {
 	mux.Handle("POST /wireguard/peer/add", s.auth(s.csrf(http.HandlerFunc(s.wgPeerAdd))))
 	mux.Handle("POST /wireguard/peer/delete", s.auth(s.csrf(http.HandlerFunc(s.wgPeerDelete))))
 	mux.Handle("POST /wireguard/peer/download", s.auth(s.csrf(http.HandlerFunc(s.wgPeerDownload))))
+	mux.Handle("GET /wireguard/peer/qr", s.auth(http.HandlerFunc(s.wgPeerQR)))
 	mux.Handle("POST /system/nginx-restart", s.auth(s.csrf(http.HandlerFunc(s.nginxRestart))))
+	mux.Handle("POST /system/update", s.auth(s.csrf(http.HandlerFunc(s.systemUpdate))))
 	mux.Handle("POST /system/reboot", s.auth(s.csrf(http.HandlerFunc(s.systemReboot))))
 
 	return s.securityHeaders(s.validHost(mux)), nil
@@ -509,8 +512,52 @@ func (s *Server) wgPeerDownload(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(config))
 }
 
+func (s *Server) wgPeerQR(w http.ResponseWriter, r *http.Request) {
+	request := PrivilegedRequest{Operation: "wg_peer_config", Peer: r.URL.Query().Get("peer")}
+	if err := request.Validate(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	client, ok := s.privileged.(PrivilegedDataClient)
+	if !ok {
+		http.Error(w, "WireGuard QR generation is unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	config, err := client.ExecuteData(request)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	png, err := qrcode.Encode(config, qrcode.Medium, 320)
+	if err != nil {
+		http.Error(w, "could not generate WireGuard QR code", http.StatusInternalServerError)
+		return
+	}
+	log.Printf("AUDIT user=%q action=%q peer=%q", s.config.Username, "wg_peer_qr", request.Peer)
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s-qr.png"`, request.Peer))
+	w.Header().Set("Content-Length", strconv.Itoa(len(png)))
+	_, _ = w.Write(png)
+}
+
 func (s *Server) nginxRestart(w http.ResponseWriter, r *http.Request) {
 	s.executeForm(w, r, PrivilegedRequest{Operation: "system_restart_nginx"})
+}
+
+func (s *Server) systemUpdate(w http.ResponseWriter, r *http.Request) {
+	request := PrivilegedRequest{Operation: "system_update"}
+	client, ok := s.privileged.(PrivilegedDataClient)
+	if !ok {
+		redirectMessage(w, r, "ERROR: system update is unavailable")
+		return
+	}
+	message, err := client.ExecuteData(request)
+	if err != nil {
+		redirectMessage(w, r, "ERROR: "+err.Error())
+		return
+	}
+	log.Printf("AUDIT user=%q action=%q", s.config.Username, request.Operation)
+	redirectMessage(w, r, message)
 }
 
 func (s *Server) systemReboot(w http.ResponseWriter, r *http.Request) {

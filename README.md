@@ -4,7 +4,7 @@
 
 ### 1. VPS-1 — Reverse Proxy
 
-This v1.0.2 installer supports **Ubuntu Server 22.04 LTS and 24.04 LTS** on `amd64` and `arm64`. Run this command on a clean VPS:
+This v1.0.3 installer supports **Ubuntu Server 22.04 LTS and 24.04 LTS** on `amd64` and `arm64`. Run this command on a clean VPS:
 
 ```bash
 sudo apt update && sudo apt install -y ca-certificates curl git && git clone https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel.git rpctl && cd rpctl && sudo bash scripts/install.sh
@@ -19,7 +19,7 @@ grep -n 'ubuntu:22.04' scripts/install.sh
 sudo bash scripts/install.sh
 ```
 
-The `grep` command must show `ubuntu:22.04|ubuntu:24.04`. The installer then downloads the latest GitHub Release, so the repository owner must publish the v1.0.2 release assets before this installation is used.
+The `grep` command must show `ubuntu:22.04|ubuntu:24.04`. The installer then downloads the latest GitHub Release, so the repository owner must publish the v1.0.3 release assets before this installation is used.
 
 Select **WireGuard private mode** in the installer. The VPS-2 client configuration will be created at:
 
@@ -51,13 +51,13 @@ sudo rm -f /root/client1.conf
 Ping VPS-1 from VPS-2:
 
 ```bash
-ping -c 4 10.77.0.1
+ping -c 4 10.10.0.1
 ```
 
 Ping VPS-2 from VPS-1:
 
 ```bash
-ping -c 4 10.77.0.2
+ping -c 4 10.10.0.2
 ```
 
 If both commands receive replies, the WireGuard connection is ready. Open the management menu on VPS-1 with:
@@ -88,7 +88,7 @@ Leaving the name empty creates the next available `clientN` name. For a default 
 
 ```text
 Name:          client2
-VPN address:   10.77.0.3/32
+VPN address:   10.10.0.3/32
 Configuration: /etc/rpctl/wireguard/peers/client2.conf
 ```
 
@@ -124,7 +124,7 @@ sudo rm -f /root/client2.conf
 If UFW is active and the website listens on port 80, allow VPS-1 through the WireGuard interface:
 
 ```bash
-sudo ufw allow in on wg0 from 10.77.0.1 to any port 80 proto tcp
+sudo ufw allow in on wg0 from 10.10.0.1 to any port 80 proto tcp
 ```
 
 ### 4. Test VPS-3
@@ -134,19 +134,19 @@ Run on VPS-3:
 ```bash
 ip address show wg0
 sudo wg show
-ping -c 4 10.77.0.1
+ping -c 4 10.10.0.1
 ```
 
 Run on VPS-1:
 
 ```bash
-ping -c 4 10.77.0.3
+ping -c 4 10.10.0.3
 ```
 
 When both servers respond, use the VPS-3 address as a reverse proxy upstream. For a website listening on port 80, enter:
 
 ```text
-http://10.77.0.3:80
+http://10.10.0.3:80
 ```
 
 ### 5. Repeat for VPS-4 through VPS-N
@@ -155,9 +155,9 @@ Run `sudo rpctl wg peer add` once for each new server, copy that peer's configur
 
 | Website server | Peer | VPN address |
 |---|---|---|
-| VPS-2 | `client1` | `10.77.0.2` |
-| VPS-3 | `client2` | `10.77.0.3` |
-| VPS-4 | `client3` | `10.77.0.4` |
+| VPS-2 | `client1` | `10.10.0.2` |
+| VPS-3 | `client2` | `10.10.0.3` |
+| VPS-4 | `client3` | `10.10.0.4` |
 | VPS-N | Next available peer | Next available address |
 
 Deleted addresses may be reused, so always use the address shown by `sudo rpctl wg peer list` instead of guessing it.
@@ -195,9 +195,10 @@ rpctl is a small Nginx reverse proxy and VPN management tool. One static Go bina
 - Create, list, inspect, download, and delete additional WireGuard peers.
 - Detect WireGuard and Tailscale interface addresses.
 - Optionally run a lightweight authenticated Web Panel.
+- Install a newer checksum-verified GitHub Release from the CLI, terminal menu, or Web Panel.
 - Run without Docker, a database, PHP, Node.js or a background CLI process.
 
-The default minimal installation contains Nginx and the rpctl binary. The Web Panel, WireGuard and acme.sh are optional. Portable backup/restore and self-update commands are not implemented yet.
+The default minimal installation contains Nginx and the rpctl binary. The Web Panel, WireGuard and acme.sh are optional. Portable backup/restore commands are not implemented yet.
 
 ## Install on a clean Ubuntu 22.04 or 24.04 VPS
 
@@ -230,7 +231,7 @@ The installer reads interactive answers from `/dev/tty`, so the one-line command
 | Prompt | Choose it when |
 |---|---|
 | WireGuard tools | The reverse proxy needs a private VPN path to another server |
-| WireGuard private mode | Only the `10.77.0.0/24` private network should use the tunnel |
+| WireGuard private mode | Only the `10.10.0.0/24` private network should use the tunnel |
 | WireGuard full-tunnel mode | All client Internet traffic should pass through VPS-1 |
 | acme.sh | You need HTTPS certificates and automatic renewal; choose it when using a Web Panel domain |
 | Web Panel | You want browser administration; the default is off to save RAM |
@@ -349,13 +350,13 @@ Cloudflare (optional)
 VPS-1: public Ubuntu 22.04/24.04 server
   Public IP: VPS1_PUBLIC_IP
   rpctl + Nginx + Let's Encrypt
-  WireGuard: 10.77.0.1
+  WireGuard: 10.10.0.1
    |
    | encrypted WireGuard tunnel
-   | HTTP http://10.77.0.2:80
+   | HTTP http://10.10.0.2:80
    v
 VPS-2: Orange Pi 5 Plus website server
-  WireGuard: 10.77.0.2
+  WireGuard: 10.10.0.2
   aaPanel + Nginx/OpenLiteSpeed + website files
 ```
 
@@ -375,8 +376,8 @@ sudo bash install.sh \
 The default private WireGuard setup creates:
 
 ```text
-VPS-1 WireGuard address     10.77.0.1/24
-VPS-2 client address        10.77.0.2/32
+VPS-1 WireGuard address     10.10.0.1/24
+VPS-2 client address        10.10.0.2/32
 WireGuard UDP port          51820
 VPS-2 client configuration  /etc/rpctl/wireguard/peers/client1.conf
 ```
@@ -400,17 +401,17 @@ Verify the interface and tunnel:
 ```bash
 ip address show wg0
 sudo wg show
-ping -c 3 10.77.0.1
+ping -c 3 10.10.0.1
 ```
 
-The expected Orange Pi address is `10.77.0.2/32`, and `wg show` should report a recent handshake.
+The expected Orange Pi address is `10.10.0.2/32`, and `wg show` should report a recent handshake.
 
-In aaPanel, create the website using its real domain, for example `shop.example.com`, and serve it on HTTP port `80`. The aaPanel web server must listen on `10.77.0.2:80` or `0.0.0.0:80`. SSL is not required on the Orange Pi in this layout because the public TLS connection ends at VPS-1 and the private hop is already encrypted by WireGuard.
+In aaPanel, create the website using its real domain, for example `shop.example.com`, and serve it on HTTP port `80`. The aaPanel web server must listen on `10.10.0.2:80` or `0.0.0.0:80`. SSL is not required on the Orange Pi in this layout because the public TLS connection ends at VPS-1 and the private hop is already encrypted by WireGuard.
 
 The Orange Pi does not need public router forwarding for ports 80 or 443. If its local firewall is active, allow VPS-1 to reach port 80 through WireGuard, for example:
 
 ```bash
-sudo ufw allow in on wg0 from 10.77.0.1 to any port 80 proto tcp
+sudo ufw allow in on wg0 from 10.10.0.1 to any port 80 proto tcp
 ```
 
 ### 3. Test VPS-1 to VPS-2 before adding a proxy
@@ -418,8 +419,8 @@ sudo ufw allow in on wg0 from 10.77.0.1 to any port 80 proto tcp
 Run these commands on VPS-1:
 
 ```bash
-ping -c 3 10.77.0.2
-curl -I -H 'Host: shop.example.com' http://10.77.0.2:80
+ping -c 3 10.10.0.2
+curl -I -H 'Host: shop.example.com' http://10.10.0.2:80
 ```
 
 The `Host` header matters because aaPanel uses it to select the correct website when several domains share the same Orange Pi address and port. Continue only after the upstream returns a valid HTTP response such as `200`, `301`, or `302`.
@@ -434,7 +435,7 @@ Name    shop.example.com (or @)
 Value   VPS1_PUBLIC_IP
 ```
 
-The record may be proxied through Cloudflare. DNS must point to the public address of VPS-1, never to the private WireGuard address `10.77.0.2`.
+The record may be proxied through Cloudflare. DNS must point to the public address of VPS-1, never to the private WireGuard address `10.10.0.2`.
 
 ### 5. Add the reverse proxy on VPS-1
 
@@ -442,7 +443,7 @@ Open the menu with `rp`, choose `3. Add proxy`, and enter:
 
 ```text
 Domain: shop.example.com
-Upstream (http://host:port): http://10.77.0.2:80
+Upstream (http://host:port): http://10.10.0.2:80
 ```
 
 The upstream value must always include all three parts:
@@ -454,7 +455,7 @@ scheme://host:port
 Valid examples:
 
 ```text
-http://10.77.0.2:80
+http://10.10.0.2:80
 http://203.0.113.20:8080
 https://backend.example.com:443
 ```
@@ -462,9 +463,9 @@ https://backend.example.com:443
 Invalid examples:
 
 ```text
-10.77.0.2
-10.77.0.2:80
-http://10.77.0.2
+10.10.0.2
+10.10.0.2:80
+http://10.10.0.2
 ```
 
 `rpctl` intentionally does not guess the scheme or port. Requiring the complete value makes HTTP versus HTTPS explicit and keeps the stored configuration predictable.
@@ -481,14 +482,14 @@ DNS propagation, Cloudflare origin settings, provider firewalls, and ports 80/44
 The equivalent noninteractive command is:
 
 ```bash
-sudo rpctl proxy add shop.example.com --upstream http://10.77.0.2:80
+sudo rpctl proxy add shop.example.com --upstream http://10.10.0.2:80
 ```
 
 Multiple aaPanel websites may use the same upstream address:
 
 ```bash
-sudo rpctl proxy add blog.example.com --upstream http://10.77.0.2:80
-sudo rpctl proxy add shop.example.com --upstream http://10.77.0.2:80
+sudo rpctl proxy add blog.example.com --upstream http://10.10.0.2:80
+sudo rpctl proxy add shop.example.com --upstream http://10.10.0.2:80
 ```
 
 VPS-1 preserves the original domain in the HTTP `Host` header, so aaPanel selects the matching virtual host.
@@ -517,10 +518,10 @@ Check each hop separately:
 
 ```bash
 # On VPS-1: VPN reachability
-ping -c 3 10.77.0.2
+ping -c 3 10.10.0.2
 
 # On VPS-1: aaPanel virtual host on Orange Pi
-curl -I -H 'Host: shop.example.com' http://10.77.0.2:80
+curl -I -H 'Host: shop.example.com' http://10.10.0.2:80
 
 # On VPS-1: generated Nginx configuration
 sudo rpctl system nginx-test
@@ -540,7 +541,7 @@ rp
 sudo rp
 rpctl status
 sudo rpctl proxy add app.example.com --upstream http://203.0.113.10:8080
-sudo rpctl proxy add nas.example.com --upstream http://10.77.0.2:8080
+sudo rpctl proxy add nas.example.com --upstream http://10.10.0.2:8080
 rpctl proxy list
 rpctl proxy list --quiet
 rpctl proxy show app.example.com
@@ -619,7 +620,7 @@ sudo rpctl web public-access disable
 
 When UFW is active, rpctl adds port `9080/tcp` only while direct access is enabled and removes only the rule marked as managed by rpctl. A domain and IP:port can remain active together. The Dashboard shows the direct URL beside **Webpanel Dashboard** while it is enabled.
 
-The panel provides the VPS and WireGuard/Tailscale addresses, CPU, RAM, swap, SSD and uptime summaries, managed proxy CRUD, WireGuard peer creation/deletion and client configuration downloads, per-domain SSL issue/renew buttons, certificate expiration days, controlled Nginx restart and VPS reboot actions, and an authenticated **Configuration Guide** page for VPS-1/VPS-2/VPS-N and desktop/mobile WireGuard clients. The guide is available at `/guide`. The header includes the project GitHub link beside Sign out. The footer reads the running version directly from the compiled binary, so every correctly built update displays its own version automatically. The layout expands on desktop and changes tables into mobile cards on narrow screens. Its red-lock favicon, HTML, and CSS are embedded in the same binary. It does not install Node.js, PHP, a database, or another binary.
+The panel provides the VPS and WireGuard/Tailscale addresses, CPU, RAM, swap, SSD and uptime summaries, managed proxy CRUD, WireGuard peer creation/deletion, client configuration downloads and QR codes, per-domain SSL issue/renew buttons, certificate expiration days, checksum-verified rpctl updates, controlled Nginx restart and VPS reboot actions, and an authenticated **Configuration Guide** page for VPS-1/VPS-2/VPS-N and desktop/mobile WireGuard clients. The guide is available at `/guide`. The header includes the project GitHub link beside Sign out. The footer reads the running version directly from the compiled binary, so every correctly built update displays its own version automatically. The layout expands on desktop and changes tables into mobile cards on narrow screens. Its red-lock favicon, HTML, and CSS are embedded in the same binary. It does not install Node.js, PHP, a database, or another binary.
 
 With IP:port access disabled, the service binds only to `127.0.0.1:9080` and Nginx is the public HTTPS entry point. Domain sessions use Secure, HttpOnly, SameSite Strict cookies. Direct `http://IP:9080` sessions use separate HttpOnly, SameSite Strict cookies because browsers cannot send Secure cookies over HTTP. Use direct HTTP as a temporary recovery path on a trusted network; it does not encrypt credentials or session traffic. State-changing forms require CSRF tokens. Password checks are serialized to protect a small CPU from parallel bcrypt requests, and the response never reveals whether the username or password was wrong.
 
@@ -647,7 +648,7 @@ Disabling stops the Web Panel and its helper socket and disables only the panel'
 Point the domain to the VPS and create its HTTP proxy first. Confirm that port 80 reaches the managed site, then issue the certificate:
 
 ```bash
-sudo rpctl proxy add app.example.com --upstream http://10.77.0.2:80
+sudo rpctl proxy add app.example.com --upstream http://10.10.0.2:80
 sudo rpctl ssl issue app.example.com
 rpctl ssl status app.example.com
 ```
@@ -662,15 +663,15 @@ Private mode is the interactive default. It creates:
 
 ```text
 Interface         wg0
-Server address    10.77.0.1/24
-Initial peer      client1, 10.77.0.2/32
+Server address    10.10.0.1/24
+Initial peer      client1, 10.10.0.2/32
 Listen port       51820/udp
 Client config     /etc/rpctl/wireguard/peers/client1.conf
 ```
 
-Private mode routes only `10.77.0.0/24`. Full mode enables IPv4 forwarding and NAT and gives the client `0.0.0.0/0`. Private keys and the preshared key are stored only in files with mode `0600`; protect the client file when copying it from the VPS.
+Private mode routes only `10.10.0.0/24`. Full mode enables IPv4 forwarding and NAT and gives the client `0.0.0.0/0`. Private keys and the preshared key are stored only in files with mode `0600`; protect the client file when copying it from the VPS.
 
-The default `/24` network provides addresses `10.77.0.2` through `10.77.0.254`, allowing up to 253 client peers after reserving `10.77.0.1` for VPS-1. `rpctl` finds the next free address automatically and creates a unique key pair and configuration for every peer:
+The default `/24` network provides addresses `10.10.0.2` through `10.10.0.254`, allowing up to 253 client peers after reserving `10.10.0.1` for VPS-1. `rpctl` finds the next free address automatically and creates a unique key pair and configuration for every peer:
 
 ```bash
 sudo rpctl wg peer add                 # Next automatic name and address
@@ -680,7 +681,7 @@ sudo rpctl wg peer show orange-pi-2
 sudo rpctl wg peer delete orange-pi-2
 ```
 
-The terminal menu exposes the same actions under item `13. WireGuard peers`. The Web Panel can create peers, download each `.conf` file, and delete peers. A downloaded configuration contains a private key and must be protected like a password. Deleting a peer removes it from the live interface and invalidates its client configuration immediately.
+The terminal menu exposes the same actions under item `13. WireGuard peers`. The Web Panel can create peers, download each `.conf` file, display a scannable QR code, and delete peers. A downloaded configuration or displayed QR code contains a private key and must be protected like a password. Deleting a peer removes it from the live interface and invalidates its client configuration immediately.
 
 ### Windows, iPhone, iPad, and Android clients
 
@@ -692,21 +693,21 @@ sudo rpctl wg peer add iphone-nam
 sudo rpctl wg peer add android-phone
 ```
 
-Download each named `.conf` file from the Web Panel and import it into the matching WireGuard application. On Windows, select **Import tunnel(s) from file** and activate the tunnel. On iPhone, iPad, or Android, add a tunnel by importing the downloaded file and activate it.
+Download each named `.conf` file from the Web Panel and import it into the matching WireGuard application. On Windows, select **Import tunnel(s) from file** and activate the tunnel. On iPhone, iPad, or Android, open **WireGuard peers** in the Web Panel and scan that device's QR code from the official WireGuard application. Create a separate peer for every device and never scan the same peer into multiple devices.
 
 Test Windows from PowerShell:
 
 ```powershell
-ping 10.77.0.1
+ping 10.10.0.1
 ```
 
-For a phone or tablet, activate its tunnel and open a known private service at a `10.77.0.x` address. Confirm the connection from VPS-1:
+For a phone or tablet, activate its tunnel and open a known private service at a `10.10.0.x` address. Confirm the connection from VPS-1:
 
 ```bash
 sudo wg show
 ```
 
-A connected device should have a recent handshake. Delete the downloaded file after importing it and never share one peer configuration between devices. In private mode, only `10.77.0.0/24` traffic uses WireGuard; normal Internet traffic continues through the device's regular connection.
+A connected device should have a recent handshake. Delete the downloaded file after importing it and never share one peer configuration between devices. In private mode, only `10.10.0.0/24` traffic uses WireGuard; normal Internet traffic continues through the device's regular connection.
 
 Defaults may be changed before installation with `RPCTL_WG_INTERFACE`, `RPCTL_WG_SERVER_ADDRESS`, `RPCTL_WG_NETWORK`, `RPCTL_WG_CLIENT_ADDRESS`, `RPCTL_WG_PORT`, `RPCTL_WG_PEER_NAME`, and `RPCTL_WG_ENDPOINT`. Existing `/etc/wireguard/INTERFACE.conf` files are never overwritten.
 
@@ -718,7 +719,17 @@ The installer never changes SSH or unmanaged Nginx sites. Private WireGuard mode
 
 ## Upgrade and recovery
 
-Rerun the reviewed installer after a new GitHub Release is published:
+From v1.0.3 onward, install the latest published GitHub Release with either method below:
+
+```bash
+sudo rpctl update
+```
+
+The same action is available as `14. Update to latest version` in the terminal menu and as **Update rpctl** in the Web Panel's System section. rpctl downloads the binary for the current architecture, verifies it against the release `SHA256SUMS`, rejects downgrades, saves the previous binary as `/usr/local/bin/rpctl.previous`, refreshes installed Web Panel units, and restarts the panel after returning the update result.
+
+An rpctl update preserves existing Nginx, Web Panel, certificate, and WireGuard configuration. The `10.10.0.0/24` default applies only when WireGuard is configured for the first time; updating does not rewrite an existing WireGuard subnet or peer configuration.
+
+The reviewed installer remains available as a recovery or manual upgrade path:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/hgn389/Reverser-Proxy-WireGuard-Tunnel/main/scripts/install.sh -o install.sh
@@ -776,7 +787,7 @@ sudo wg show
 - SSL v1 uses Let's Encrypt HTTP-01; DNS-01 is not implemented.
 - Automatic peer allocation currently supports IPv4 WireGuard subnets from `/16` through `/30`.
 - Tailscale addresses are detected, but rpctl does not install or administer Tailscale yet.
-- Portable backup/restore and `rpctl update` are not implemented yet.
+- Portable backup/restore commands are not implemented yet.
 - Direct Web Panel access at `http://IP:9080` is unencrypted and should be used only as a temporary recovery path.
 
 ## License

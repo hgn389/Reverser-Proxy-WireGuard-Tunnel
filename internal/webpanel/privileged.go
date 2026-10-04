@@ -3,6 +3,7 @@ package webpanel
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 
 	"rpctl/internal/certmgr"
 	"rpctl/internal/proxy"
+	"rpctl/internal/updater"
 	"rpctl/internal/wireguard"
 )
 
@@ -56,7 +58,7 @@ func (r PrivilegedRequest) Validate() error {
 			return errors.New("upstream is not allowed for this operation")
 		}
 		return proxy.ValidateDomain(r.Domain)
-	case "nginx_test", "system_restart_nginx", "system_reboot", "ssl_status_all":
+	case "nginx_test", "system_restart_nginx", "system_reboot", "system_update", "ssl_status_all":
 		if r.Domain != "" || r.Upstream != "" || r.Peer != "" {
 			return fmt.Errorf("%s does not accept arguments", r.Operation)
 		}
@@ -233,6 +235,19 @@ func servePrivilegedOnce(reader io.Reader, writer io.Writer, store proxy.Store, 
 			}
 		case "system_reboot":
 			operationErr = system.ScheduleReboot()
+		case "system_update":
+			var result updater.Result
+			result, operationErr = updater.DefaultManager().UpdateLatest(context.Background())
+			if operationErr == nil {
+				if result.Updated {
+					responseData = fmt.Sprintf("rpctl updated successfully from %s to %s. The Web Panel will restart shortly.", result.Previous, result.Current)
+				} else {
+					responseData = fmt.Sprintf("rpctl %s is already the latest release.", result.Current)
+				}
+				if result.Warning != "" {
+					responseData += " WARNING: " + result.Warning
+				}
+			}
 		case "wg_peer_list":
 			var peers []wireguard.Peer
 			peers, operationErr = wireguard.DefaultManager().List()

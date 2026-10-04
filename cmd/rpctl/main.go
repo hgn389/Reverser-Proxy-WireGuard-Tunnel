@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -24,6 +25,7 @@ import (
 
 	"rpctl/internal/certmgr"
 	"rpctl/internal/proxy"
+	"rpctl/internal/updater"
 	"rpctl/internal/webpanel"
 	"rpctl/internal/wireguard"
 )
@@ -84,6 +86,7 @@ func help() {
   rpctl wg peer add [NAME]
   rpctl wg peer show NAME
   rpctl wg peer delete NAME
+  rpctl update
   rpctl version
 
 Proxy changes require root. HTTP and HTTPS upstreams are supported;
@@ -215,6 +218,26 @@ func run(s proxy.Store, args []string) error {
 		return errors.New("usage: rpctl system nginx-test|reload|recover")
 	case "wg":
 		return wgCommand(args[1:])
+	case "update":
+		if len(args) != 1 {
+			return errors.New("usage: rpctl update")
+		}
+		if err := root(); err != nil {
+			return err
+		}
+		result, err := updater.DefaultManager().UpdateLatest(context.Background())
+		if err != nil {
+			return err
+		}
+		if !result.Updated {
+			fmt.Printf("rpctl %s is already the latest release.\n", result.Current)
+			return nil
+		}
+		fmt.Printf("rpctl updated successfully: %s -> %s\n", result.Previous, result.Current)
+		if result.Warning != "" {
+			fmt.Fprintln(os.Stderr, "WARNING:", result.Warning)
+		}
+		return nil
 	default:
 		return fmt.Errorf("unknown command %q; run rpctl help", args[0])
 	}
@@ -803,7 +826,7 @@ func menu(s proxy.Store) error {
 		fmt.Println("# Server IP:", serverIPs)
 		fmt.Println("# VPN IP:   ", vpnIPs)
 		fmt.Print("------------------------------------------------------------\n")
-		fmt.Print("1. Status\n2. List proxy domains\n3. Add proxy\n4. Edit proxy\n5. Enable proxy\n6. Disable proxy\n7. Delete proxy\n8. Test Nginx\n9. SSL certificates\n10. Install Webpanel Reverse Proxy\n11. Unblock Webpanel IP\n12. On-OFF Webpanel via IP:port\n13. WireGuard peers\n0. Exit\n")
+		fmt.Print("1. Status\n2. List proxy domains\n3. Add proxy\n4. Edit proxy\n5. Enable proxy\n6. Disable proxy\n7. Delete proxy\n8. Test Nginx\n9. SSL certificates\n10. Install Webpanel Reverse Proxy\n11. Unblock Webpanel IP\n12. On-OFF Webpanel via IP:port\n13. WireGuard peers\n14. Update to latest version\n0. Exit\n")
 		fmt.Print("############################################################\nChoice: ")
 		choice, err := reader.ReadString('\n')
 		if err != nil {
@@ -883,6 +906,14 @@ func menu(s proxy.Store) error {
 			}
 			printMenuGap()
 			continue
+		case "14":
+			confirm := strings.ToLower(prompt(reader, "Download and install the latest GitHub release? [y/N]: "))
+			if confirm != "y" && confirm != "yes" {
+				fmt.Println("Update cancelled.")
+				printMenuGap()
+				continue
+			}
+			args = []string{"update"}
 		default:
 			fmt.Println("Unknown choice.")
 			printMenuGap()

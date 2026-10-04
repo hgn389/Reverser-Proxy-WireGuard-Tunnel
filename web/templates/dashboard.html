@@ -21,6 +21,7 @@
         <h2>System</h2>
         <div class="system-actions">
           <form method="post" action="/system/nginx-restart"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="secondary">Restart Nginx</button></form>
+          <details class="update-confirm"><summary>Update rpctl</summary><div><p>Download, verify, and install the latest GitHub release?</p><form method="post" action="/system/update"><input type="hidden" name="csrf" value="{{.CSRF}}"><button>Confirm Update</button></form></div></details>
           <details class="reboot-confirm"><summary>Reboot VPS</summary><div><p>The VPS and all hosted websites will be temporarily unavailable.</p><form method="post" action="/system/reboot"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="danger">Confirm Reboot</button></form></div></details>
         </div>
       </div>
@@ -45,26 +46,27 @@
         <label>Peer name (optional)<input name="peer" placeholder="client2" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,31}" maxlength="32"></label>
         <button type="submit">Create peer</button>
       </form>
-      <p class="form-hint">Leave the name empty to create the next client automatically. Every peer receives a unique VPN address and configuration.</p>
+      <p class="form-hint">Leave the name empty to create the next client automatically. Every peer receives a unique VPN address and configuration. Each QR code contains that peer's private key; show it only to the intended device.</p>
       {{if .PeerError}}
       <div class="alert error">{{.PeerError}}</div>
       {{else}}
       <div class="table-wrap peer-table-wrap">
         <table class="peer-table">
-          <thead><tr><th>Name</th><th>VPN address</th><th>Client configuration</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Name</th><th>VPN address</th><th>Client configuration</th><th>QR</th><th>Actions</th></tr></thead>
           <tbody>
           {{range .Peers}}
             <tr>
               <td data-label="Name">{{.Name}}</td>
               <td data-label="VPN address"><code>{{.Address}}</code></td>
               <td data-label="Configuration"><code>{{.ConfigPath}}</code></td>
+              <td data-label="QR" class="qr-cell"><a href="/wireguard/peer/qr?peer={{.Name}}" target="_blank" rel="noopener noreferrer" title="Open QR code for {{.Name}}"><img src="/wireguard/peer/qr?peer={{.Name}}" width="120" height="120" loading="lazy" alt="WireGuard QR code for {{.Name}}"></a></td>
               <td data-label="Actions" class="actions-cell peer-actions-cell"><div class="actions-content peer-actions">
                 <form method="post" action="/wireguard/peer/download"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="peer" value="{{.Name}}"><button class="secondary">Download</button></form>
                 <details class="reboot-confirm peer-delete-confirm"><summary>Delete</summary><div><p>Delete WireGuard peer <strong>{{.Name}}</strong>?</p><form method="post" action="/wireguard/peer/delete"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="peer" value="{{.Name}}"><button class="danger">Confirm Delete</button></form></div></details>
               </div></td>
             </tr>
           {{else}}
-            <tr><td class="empty" colspan="4">No managed WireGuard peers.</td></tr>
+            <tr><td class="empty" colspan="5">No managed WireGuard peers.</td></tr>
           {{end}}
           </tbody>
         </table>
@@ -77,7 +79,7 @@
       <form class="inline-form" method="post" action="/proxy/add">
         <input type="hidden" name="csrf" value="{{.CSRF}}">
         <label>Domain<input name="domain" placeholder="app.example.com" required></label>
-        <label>Upstream<input name="upstream" placeholder="http://10.77.0.2:80" required></label>
+        <label>Upstream<input name="upstream" placeholder="http://10.10.0.2:80" required></label>
         <button type="submit">Add</button>
       </form>
     </section>

@@ -657,6 +657,7 @@ LockPersonality=true
 ReadWritePaths=/etc/rpctl/sites /etc/nginx/sites-available /etc/nginx/sites-enabled /var/lib/rpctl/rollback /run/rpctl
 ReadWritePaths=-/etc/rpctl/certs -/etc/rpctl/acme -/var/lib/rpctl/acme-webroot -/etc/rpctl/wireguard -/etc/wireguard
 ReadWritePaths=-/var/log/nginx -/run/nginx.pid
+ReadWritePaths=-/usr/local/bin -/etc/systemd/system
 `
 
 const sslRenewNginxRuntimeDropIn = `# Managed by rpctl.

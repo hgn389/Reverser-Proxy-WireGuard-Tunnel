@@ -19,9 +19,9 @@ web_option_seen=no
 firewall_option_seen=no
 
 wg_interface="${RPCTL_WG_INTERFACE:-wg0}"
-wg_server_address="${RPCTL_WG_SERVER_ADDRESS:-10.77.0.1/24}"
-wg_network="${RPCTL_WG_NETWORK:-10.77.0.0/24}"
-wg_client_address="${RPCTL_WG_CLIENT_ADDRESS:-10.77.0.2/32}"
+wg_server_address="${RPCTL_WG_SERVER_ADDRESS:-10.10.0.1/24}"
+wg_network="${RPCTL_WG_NETWORK:-10.10.0.0/24}"
+wg_client_address="${RPCTL_WG_CLIENT_ADDRESS:-10.10.0.2/32}"
 wg_port="${RPCTL_WG_PORT:-51820}"
 wg_peer_name="${RPCTL_WG_PEER_NAME:-client1}"
 wg_endpoint="${RPCTL_WG_ENDPOINT:-}"

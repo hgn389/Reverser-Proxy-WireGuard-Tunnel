@@ -195,6 +195,7 @@ func TestPrivilegedRequestValidation(t *testing.T) {
 		{Operation: "nginx_test"},
 		{Operation: "system_restart_nginx"},
 		{Operation: "system_reboot"},
+		{Operation: "system_update"},
 		{Operation: "wg_peer_list"},
 		{Operation: "wg_peer_add"},
 		{Operation: "wg_peer_add", Peer: "origin-3"},
@@ -514,7 +515,7 @@ func TestDashboardSSLControlsAndResponsiveAssets(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := rendered.String()
-	for _, expected := range []string{"/ssl/issue", "/ssl/renew", "Issue certificate", "Renew certificate", "45 days", "Expires 2026-11-16", "12 days", "class=\"proxy-table\"", "class=\"ssl-content\"", "class=\"actions-content\"", "Reverse Proxy &amp; VPN Tunnel", "Configuration Guide", "https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel", "rpctl vtest", "Nam Hoàng", "203.0.113.1", "10.77.0.1", "1 vCPU", "128 / 512 MB used", "1.0 GB", "5.0 / 20.0 GB used", "Webpanel Dashboard", "http://203.0.113.1:9080", "/system/nginx-restart", "/system/reboot", "/wireguard/peer/add", "/wireguard/peer/download", "/wireguard/peer/delete", "client2", "10.77.0.3/32", "/static/favicon.svg"} {
+	for _, expected := range []string{"/ssl/issue", "/ssl/renew", "Issue certificate", "Renew certificate", "45 days", "Expires 2026-11-16", "12 days", "class=\"proxy-table\"", "class=\"ssl-content\"", "class=\"actions-content\"", "Reverse Proxy &amp; VPN Tunnel", "Configuration Guide", "https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel", "rpctl vtest", "Nam Hoàng", "203.0.113.1", "10.77.0.1", "1 vCPU", "128 / 512 MB used", "1.0 GB", "5.0 / 20.0 GB used", "Webpanel Dashboard", "http://203.0.113.1:9080", "/system/nginx-restart", "/system/update", "/system/reboot", "/wireguard/peer/add", "/wireguard/peer/download", "/wireguard/peer/qr?peer=client2", "/wireguard/peer/delete", "client2", "10.77.0.3/32", "/static/favicon.svg"} {
 		if !strings.Contains(html, expected) {
 			t.Errorf("dashboard is missing %q", expected)
 		}
@@ -592,6 +593,13 @@ func TestWireGuardPeerWebActions(t *testing.T) {
 	server.wgPeerDownload(download, request)
 	if download.Code != http.StatusOK || !strings.Contains(download.Header().Get("Content-Disposition"), "client2.conf") || !strings.Contains(download.Body.String(), "10.77.0.3/32") {
 		t.Fatalf("download status=%d headers=%v body=%s", download.Code, download.Header(), download.Body.String())
+	}
+
+	qr := httptest.NewRecorder()
+	request = httptest.NewRequest(http.MethodGet, "https://panel.example.com/wireguard/peer/qr?peer=client2", nil)
+	server.wgPeerQR(qr, request)
+	if qr.Code != http.StatusOK || qr.Header().Get("Content-Type") != "image/png" || !bytes.HasPrefix(qr.Body.Bytes(), []byte("\x89PNG\r\n\x1a\n")) {
+		t.Fatalf("QR status=%d headers=%v", qr.Code, qr.Header())
 	}
 
 	remove := httptest.NewRecorder()
