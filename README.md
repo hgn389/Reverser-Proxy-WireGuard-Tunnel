@@ -4,7 +4,7 @@
 
 ### 1. VPS-1 — Reverse Proxy
 
-This v1.0.7 installer supports **Ubuntu Server 22.04 LTS and 24.04 LTS** on `amd64` and `arm64`. Run this command on a clean VPS:
+This v1.0.8 installer supports **Ubuntu Server 22.04 LTS and 24.04 LTS** on `amd64` and `arm64`. Run this command on a clean VPS:
 
 ```bash
 sudo apt update && sudo apt install -y ca-certificates curl git && git clone https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel.git rpctl && cd rpctl && sudo bash scripts/install.sh
@@ -19,7 +19,7 @@ grep -n 'ubuntu:22.04' scripts/install.sh
 sudo bash scripts/install.sh
 ```
 
-The `grep` command must show `ubuntu:22.04|ubuntu:24.04`. The installer then downloads the latest GitHub Release, so the repository owner must publish the v1.0.7 release assets before this installation is used.
+The `grep` command must show `ubuntu:22.04|ubuntu:24.04`. The installer then downloads the latest GitHub Release, so the repository owner must publish the v1.0.8 release assets before this installation is used.
 
 The installer first asks for a VPN backend:
 
@@ -66,6 +66,8 @@ The VPS-2 client configuration will be created at:
 /etc/rpctl/wireguard/peers/client1.conf
 ```
 
+When the optional Web Panel is selected, the installer asks for an optional lowercase public DNS name such as `panel.example.com` before WireGuard or Tailscale is activated. After a domain is entered, it displays the detected public IPv4 address and pauses until the user confirms that the domain's DNS record will point to that address. The installer automatically includes acme.sh, creates the Web Panel reverse proxy, and issues its SSL certificate when DNS and port 80 are ready. Direct `http://SERVER_IP:9080` access is enabled by default without an additional setup question and remains available as a temporary fallback.
+
 ### 2. Copy the configuration to VPS-2
 
 Copy this file from VPS-1 to `/root/client1.conf` on VPS-2. Windows users can transfer it through **WinSCP**.
@@ -109,7 +111,7 @@ sudo rp
 
 ## Tailscale Quick Start
 
-Select **Tailscale** in the installer to install the official stable Tailscale package instead of configuring WireGuard. The installer starts `tailscaled` and displays a secure login URL. Complete the login to add VPS-1 to your tailnet.
+Select **Tailscale** in the installer to install the official stable Tailscale package instead of configuring WireGuard. If the Web Panel is selected, its domain, administrator account, and HTTPS preference are collected before the Tailscale login begins. The installer then starts `tailscaled` and displays a secure login URL. Complete the login to add VPS-1 to your tailnet.
 
 Install Tailscale on every upstream server and sign in to the same tailnet. Retrieve each server's address with:
 
@@ -675,7 +677,7 @@ If the initial installation skipped the Web Panel, run `sudo rp`, then choose:
 10. Install Webpanel Reverse Proxy
 ```
 
-The setup asks for an optional dedicated domain such as `panel.example.com`, an admin username, and a 12–72 byte password. It stores only a bcrypt password hash. A new installation enables `http://SERVER_IP:9080` immediately. When a domain is entered, rpctl creates its proxy at `http://127.0.0.1:9080`, verifies that the public HTTP route reaches VPS-1, and automatically issues the Let's Encrypt certificate when DNS is ready. If DNS is not ready, direct IP:port access remains available and the installer prints the exact terminal menu path for issuing SSL later.
+The setup asks for an optional dedicated domain such as `panel.example.com`, followed by an admin username and a 12–72 byte password. After a domain is entered, it shows the detected public IPv4 address and requires confirmation before installation continues. It stores only a bcrypt password hash. A new installation enables `http://SERVER_IP:9080` automatically. When a domain is entered, rpctl creates its proxy at `http://127.0.0.1:9080`, verifies that the public HTTP route reaches VPS-1, and automatically issues the Let's Encrypt certificate when DNS is ready. If DNS is not ready, direct IP:port access remains available and the installer prints the exact terminal menu path for issuing SSL later.
 
 The command-line equivalent is:
 

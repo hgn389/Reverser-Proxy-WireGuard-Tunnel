@@ -19,6 +19,12 @@ wireguard_option_seen=no
 acme_option_seen=no
 web_option_seen=no
 firewall_option_seen=no
+web_domain=''
+web_username=''
+web_password=''
+web_password_confirmation=''
+web_password_display=''
+web_wan_ip=''
 
 wg_network_env_set=no
 wg_server_address_env_set=no
@@ -88,6 +94,36 @@ valid_endpoint_host() {
     ((${#label} >= 1 && ${#label} <= 63)) || return 1
     [[ $label =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$ ]] || return 1
   done
+}
+
+valid_web_domain() {
+  local domain=$1 label
+  local -a labels
+  ((${#domain} >= 3 && ${#domain} <= 253)) || return 1
+  [[ $domain == "${domain,,}" && $domain == *.* && $domain != .* && $domain != *. && $domain != *..* ]] || return 1
+  valid_ipv4 "$domain" && return 1
+  IFS=. read -r -a labels <<< "$domain"
+  for label in "${labels[@]}"; do
+    ((${#label} >= 1 && ${#label} <= 63)) || return 1
+    [[ $label =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]] || return 1
+  done
+}
+
+detect_wan_ipv4() {
+  local address
+  address=$(/usr/bin/curl --fail --silent --show-error --max-time 10 --proto '=https' https://api.ipify.org 2>/dev/null || true)
+  address=${address//$'\r'/}
+  address=${address//$'\n'/}
+  if valid_ipv4 "$address"; then
+    printf '%s\n' "$address"
+    return 0
+  fi
+  address=$(/usr/sbin/ip -4 route get 1.1.1.1 2>/dev/null | /usr/bin/awk '{ for (i = 1; i <= NF; i++) if ($i == "src") { print $(i+1); exit } }')
+  if valid_ipv4 "$address"; then
+    printf '%s\n' "$address"
+    return 0
+  fi
+  return 1
 }
 
 ipv4_to_int() {
@@ -597,7 +633,59 @@ if [[ $web == ask ]]; then
     die 'No terminal detected. Pass --web or --no-web.'
   fi
 fi
-if [[ $acme == ask ]]; then
+if [[ $web == yes ]]; then
+  if [[ $has_tty == yes ]]; then
+    while :; do
+      printf 'Web Panel domain (for example panel.example.com; press Enter to skip): ' > /dev/tty
+      IFS= read -r web_domain < /dev/tty || die 'Could not read the Web Panel domain.'
+      if [[ -z $web_domain ]] || valid_web_domain "$web_domain"; then
+        break
+      fi
+      printf 'Enter a lowercase public DNS name such as panel.example.com.\n' > /dev/tty
+    done
+    if [[ -n $web_domain ]]; then
+      web_wan_ip=$(detect_wan_ipv4) || die 'Could not detect this VPS public IPv4 address. Check the network connection and try again.'
+      printf '\nDNS configuration required\n' > /dev/tty
+      printf 'Point the DNS record for %s to this VPS public IPv4 address: %s\n' "$web_domain" "$web_wan_ip" > /dev/tty
+      printf 'Configure the DNS record now, then confirm to continue installation. [y/N] ' > /dev/tty
+      IFS= read -r answer < /dev/tty || die 'Could not read terminal input.'
+      case "$answer" in
+        y|Y|yes|YES) ;;
+        *) die 'Installation cancelled. Point the Web Panel domain to this VPS and run the installer again.' ;;
+      esac
+    fi
+    printf 'Admin username: ' > /dev/tty
+    IFS= read -r web_username < /dev/tty || die 'Could not read the Web Panel username.'
+    [[ $web_username =~ ^[A-Za-z0-9_.-]{3,32}$ ]] || die 'The Web Panel username must be 3-32 letters, numbers, dots, underscores, or hyphens.'
+    printf 'Admin password (12-72 characters): ' > /dev/tty
+    IFS= read -r -s web_password < /dev/tty || die 'Could not read the Web Panel password.'
+    printf '\nConfirm password: ' > /dev/tty
+    IFS= read -r -s web_password_confirmation < /dev/tty || die 'Could not confirm the Web Panel password.'
+    printf '\n' > /dev/tty
+    [[ $web_password == "$web_password_confirmation" ]] || die 'Web Panel password confirmation does not match.'
+    ((${#web_password} >= 12 && ${#web_password} <= 72)) || die 'The Web Panel password must contain 12-72 characters.'
+    if LC_ALL=C /usr/bin/grep -q '[^ -~]' <<< "$web_password"; then
+      die 'The interactive Web Panel password must contain printable ASCII characters only.'
+    fi
+    web_password_display=$web_password
+    unset web_password_confirmation
+  else
+    [[ -n ${RPCTL_WEB_USERNAME:-} && -n ${RPCTL_WEB_PASSWORD_FILE:-} ]] || \
+      die 'Noninteractive --web requires RPCTL_WEB_USERNAME and RPCTL_WEB_PASSWORD_FILE. RPCTL_WEB_DOMAIN is optional.'
+    web_domain=${RPCTL_WEB_DOMAIN:-}
+    [[ -z $web_domain ]] || valid_web_domain "$web_domain" || die 'RPCTL_WEB_DOMAIN must be a lowercase public DNS name.'
+    web_username=$RPCTL_WEB_USERNAME
+    [[ $web_username =~ ^[A-Za-z0-9_.-]{3,32}$ ]] || die 'RPCTL_WEB_USERNAME must be 3-32 letters, numbers, dots, underscores, or hyphens.'
+    web_password_display='(the password supplied in RPCTL_WEB_PASSWORD_FILE)'
+  fi
+fi
+if [[ $web == yes && -n $web_domain && $acme == no ]]; then
+  die 'A domain-based Web Panel requires acme.sh. Remove --no-acme or install without a Web Panel domain.'
+fi
+if [[ $web == yes && -n $web_domain && $acme == ask ]]; then
+  acme=yes
+  info "acme.sh will be installed to issue and renew HTTPS for ${web_domain}."
+elif [[ $acme == ask ]]; then
   if [[ $has_tty == yes ]]; then
     if [[ $web == yes ]]; then
       printf 'Install acme.sh for Web Panel HTTPS certificates and automatic renewal? [Y/n] ' > /dev/tty
@@ -841,32 +929,15 @@ elif [[ $ufw_active == yes ]]; then
   info 'UFW is active; rpctl service firewall rules were not changed.'
 fi
 
-web_domain=''
-web_username=''
-web_password_display=''
 if [[ $web == yes ]]; then
   web_firewall_args=()
   if [[ $firewall == no ]]; then
     web_firewall_args+=(--no-open-firewall)
   fi
   if [[ $has_tty == yes ]]; then
-    printf 'Web Panel domain (press Enter to use IP:9080 only): ' > /dev/tty
-    IFS= read -r web_domain < /dev/tty || die 'Could not read the Web Panel domain.'
-    printf 'Admin username: ' > /dev/tty
-    IFS= read -r web_username < /dev/tty || die 'Could not read the Web Panel username.'
-    printf 'Admin password (12-72 characters): ' > /dev/tty
-    IFS= read -r -s web_password < /dev/tty || die 'Could not read the Web Panel password.'
-    printf '\nConfirm password: ' > /dev/tty
-    IFS= read -r -s web_password_confirmation < /dev/tty || die 'Could not confirm the Web Panel password.'
-    printf '\n' > /dev/tty
-    [[ $web_password == "$web_password_confirmation" ]] || die 'Web Panel password confirmation does not match.'
-    if LC_ALL=C /usr/bin/grep -q '[^ -~]' <<< "$web_password"; then
-      die 'The interactive Web Panel password must contain printable ASCII characters only.'
-    fi
     web_password_file="$workdir/web-password"
     (umask 077; printf '%s' "$web_password" > "$web_password_file")
-    web_password_display=$web_password
-    unset web_password web_password_confirmation
+    unset web_password
     /usr/local/bin/rpctl web install \
       --domain "$web_domain" \
       --username "$web_username" \
@@ -875,11 +946,6 @@ if [[ $web == yes ]]; then
       die 'Web Panel installation failed; the core CLI remains installed.'
     rm -f -- "$web_password_file"
   else
-    [[ -n ${RPCTL_WEB_USERNAME:-} && -n ${RPCTL_WEB_PASSWORD_FILE:-} ]] || \
-      die 'Noninteractive --web requires RPCTL_WEB_USERNAME and RPCTL_WEB_PASSWORD_FILE. RPCTL_WEB_DOMAIN is optional.'
-    web_domain=${RPCTL_WEB_DOMAIN:-}
-    web_username=$RPCTL_WEB_USERNAME
-    web_password_display='(the password supplied in RPCTL_WEB_PASSWORD_FILE)'
     /usr/local/bin/rpctl web install \
       --domain "$web_domain" \
       --username "$web_username" \
@@ -899,7 +965,8 @@ MOTD
 install -m 0755 "$workdir/99-rpctl" "$motd_path"
 
 if [[ $web == yes ]]; then
-  server_ip=$(/usr/sbin/ip -4 route get 1.1.1.1 2>/dev/null | /usr/bin/awk '{ for (i = 1; i <= NF; i++) if ($i == "src") { print $(i+1); exit } }')
+  server_ip=$web_wan_ip
+  [[ -n $server_ip ]] || server_ip=$(detect_wan_ipv4 || true)
   [[ -n $server_ip ]] || server_ip='SERVER_IP'
   web_ssl_ready=no
   if [[ -n $web_domain ]] && /usr/local/bin/rpctl ssl status "$web_domain" | /usr/bin/awk '$2 == "enabled" { found=1 } END { exit !found }'; then

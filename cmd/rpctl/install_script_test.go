@@ -79,10 +79,28 @@ func TestInstallerOffersTailscaleBackend(t *testing.T) {
 		"pkgs.tailscale.com/stable/ubuntu/${VERSION_CODENAME}.noarmor.gpg",
 		"pkgs.tailscale.com/stable/ubuntu/${VERSION_CODENAME}.tailscale-keyring.list",
 		"write_vpn_mode \"$vpn_backend\"",
+		"Web Panel domain (for example panel.example.com; press Enter to skip):",
+		"DNS configuration required",
+		"Point the DNS record for %s to this VPS public IPv4 address: %s",
+		"Configure the DNS record now, then confirm to continue installation. [y/N]",
+		"valid_web_domain",
+		"detect_wan_ipv4",
+		"acme.sh will be installed to issue and renew HTTPS",
 	} {
 		if !strings.Contains(installer, expected) {
 			t.Errorf("installer is missing Tailscale behavior %q", expected)
 		}
+	}
+	mainFlowMarker := "\nfor arg in \"$@\"; do\n"
+	mainFlowIndex := strings.Index(installer, mainFlowMarker)
+	if mainFlowIndex < 0 {
+		t.Fatal("installer argument parser marker was not found")
+	}
+	mainFlow := installer[mainFlowIndex:]
+	domainPrompt := strings.Index(mainFlow, "Web Panel domain (for example panel.example.com; press Enter to skip):")
+	tailscaleSetup := strings.Index(mainFlow, "\n  configure_tailscale\n")
+	if domainPrompt < 0 || tailscaleSetup < 0 || domainPrompt > tailscaleSetup {
+		t.Error("Web Panel domain setup must run before the interactive Tailscale login")
 	}
 }
 
@@ -114,6 +132,14 @@ for network in 10.79.0.0/24 192.168.150.0/24 172.16.0.0/16 10.0.0.0/30; do
 done
 for network in 8.8.8.0/24 192.168.2.1/24 172.15.0.0/16 172.32.0.0/16 10.79.0.0/31 10.79.0.0; do
   if valid_wireguard_network "$network"; then
+    exit 1
+  fi
+done
+for domain in panel.example.com rp.example.net; do
+  valid_web_domain "$domain"
+done
+for domain in panel PANEL.example.com 203.0.113.10 -panel.example.com panel_.example.com; do
+  if valid_web_domain "$domain"; then
     exit 1
   fi
 done
