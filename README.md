@@ -4,7 +4,7 @@
 
 ### 1. VPS-1 — Reverse Proxy
 
-This v1.0.4 installer supports **Ubuntu Server 22.04 LTS and 24.04 LTS** on `amd64` and `arm64`. Run this command on a clean VPS:
+This v1.0.5 installer supports **Ubuntu Server 22.04 LTS and 24.04 LTS** on `amd64` and `arm64`. Run this command on a clean VPS:
 
 ```bash
 sudo apt update && sudo apt install -y ca-certificates curl git && git clone https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel.git rpctl && cd rpctl && sudo bash scripts/install.sh
@@ -19,7 +19,7 @@ grep -n 'ubuntu:22.04' scripts/install.sh
 sudo bash scripts/install.sh
 ```
 
-The `grep` command must show `ubuntu:22.04|ubuntu:24.04`. The installer then downloads the latest GitHub Release, so the repository owner must publish the v1.0.4 release assets before this installation is used.
+The `grep` command must show `ubuntu:22.04|ubuntu:24.04`. The installer then downloads the latest GitHub Release, so the repository owner must publish the v1.0.5 release assets before this installation is used.
 
 Select **WireGuard private mode** in the installer. The VPS-2 client configuration will be created at:
 

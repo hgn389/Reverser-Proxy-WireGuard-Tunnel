@@ -60,11 +60,11 @@
       <rect x="1120" y="164" width="88" height="30" rx="6" fill="#30363d"/><text x="1164" y="184" fill="#fff" font-size="13" text-anchor="middle">Download</text>
       <rect x="1218" y="164" width="72" height="30" rx="6" fill="#da3633"/><text x="1254" y="184" fill="#fff" font-size="13" text-anchor="middle">Delete</text>
       <path d="M22 205h1340" stroke="#30363d"/>
-      <g fill="#c9d1d9" font-size="12">
-        <text x="34" y="226">• Name: the name of the newly added device.</text>
-        <text x="700" y="226">• VPN address: the private VPN IP assigned by VPS-1.</text>
-        <text x="34" y="247">• Download the peer configuration file to connect the device to VPS-1.</text>
-        <text x="700" y="247">• Use the QR code to connect a mobile device quickly.</text>
+      <g fill="#6e7681" font-size="8">
+        <text x="34" y="218">• Name: the name of the newly added device.</text>
+        <text x="34" y="229">• VPN address: the private VPN IP assigned by VPS-1.</text>
+        <text x="34" y="240">• Download the peer configuration file to connect the device to VPS-1.</text>
+        <text x="34" y="251">• Use the QR code to connect a mobile device quickly.</text>
       </g>
     </g>
 
@@ -80,12 +80,12 @@
       <rect x="1052" y="78" width="72" height="42" rx="6" fill="#238636"/>
       <text x="1088" y="104" fill="#fff" font-size="14" font-weight="700" text-anchor="middle">Add</text>
       <path d="M22 140h1340" stroke="#30363d"/>
-      <text x="34" y="163" fill="#c9d1d9" font-size="12"><tspan font-weight="700">Ex:</tspan> shop.example.com → VPS-1(10.10.0.1) → WireGuard → VPS-2 Webserver(http://10.10.0.25:80)</text>
-      <g fill="#c9d1d9" font-size="12">
-        <text x="34" y="188">• Domain: the public hostname used to access the website or application.</text>
-        <text x="700" y="188">• Upstream: the HTTP address that receives requests from VPS-1.</text>
-        <text x="34" y="213">• The upstream service must be running and reachable from VPS-1.</text>
-        <text x="700" y="213">• Add the proxy, then issue SSL from Reverse proxies.</text>
+      <text x="34" y="158" fill="#6e7681" font-size="8"><tspan font-weight="700">Ex:</tspan> shop.example.com → VPS-1(10.10.0.1) → WireGuard → VPS-2 Webserver(http://10.10.0.25:80)</text>
+      <g fill="#6e7681" font-size="8">
+        <text x="34" y="174">• Domain: the public hostname used to access the website or application.</text>
+        <text x="34" y="185">• Upstream: the HTTP address that receives requests from VPS-1.</text>
+        <text x="34" y="196">• The upstream service must be running and reachable from VPS-1.</text>
+        <text x="34" y="207">• Add the proxy, then issue SSL from Reverse proxies.</text>
       </g>
     </g>
 

@@ -533,7 +533,7 @@ func TestDashboardSSLControlsAndResponsiveAssets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"max-width: 1680px", "@media (max-width: 760px)", ".proxy-table { min-width: 1040px; }", ".peer-table { min-width: 860px; table-layout: fixed; }", ".peer-config-column { width: 34%; }", ".qr-dialog::backdrop", "width: clamp(170px, 18vw, 260px)", "flex-wrap: nowrap", "height: 2.6rem"} {
+	for _, expected := range []string{"max-width: 1680px", "@media (max-width: 760px)", ".proxy-table { min-width: 1040px; }", ".peer-table { min-width: 860px; table-layout: fixed; }", ".peer-config-column { width: 34%; }", ".peer-help, .proxy-help { color: #6e7681; font-size: 8px; text-align: left; }", ".peer-help ul, .proxy-help ul { display: block;", ".qr-dialog::backdrop", "width: clamp(170px, 18vw, 260px)", "flex-wrap: nowrap", "height: 2.6rem"} {
 		if !strings.Contains(string(css), expected) {
 			t.Errorf("responsive stylesheet is missing %q", expected)
 		}
