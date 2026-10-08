@@ -39,6 +39,7 @@ type Peer struct {
 	Address    string `json:"address"`
 	PublicKey  string `json:"public_key"`
 	ConfigPath string `json:"config_path"`
+	Mode       string `json:"mode"`
 }
 
 type clientDefaults struct {
@@ -67,6 +68,7 @@ type Manager struct {
 	WGPath     string
 	WGQuick    string
 	Runner     Runner
+	Routing    *RoutingManager
 }
 
 func DefaultManager() Manager {
@@ -269,7 +271,7 @@ func (m Manager) AddWithLastOctet(requestedName string, lastOctet int) (Peer, er
 	if err := m.commit(serverConfig, serverCandidate, peerPath, clientConfig, false); err != nil {
 		return Peer{}, err
 	}
-	return Peer{Name: name, Address: address, PublicKey: clientPublic, ConfigPath: peerPath}, nil
+	return Peer{Name: name, Address: address, PublicKey: clientPublic, ConfigPath: peerPath, Mode: modeFromAllowedIPs(defaults.AllowedIPs)}, nil
 }
 
 func (m Manager) Delete(name string) error {
@@ -391,7 +393,11 @@ func (m Manager) readPeerWithKeys(name string, publicKeys map[string]string) (Pe
 	if publicKey == "" {
 		return Peer{}, fmt.Errorf("peer %s is missing from the WireGuard server configuration", name)
 	}
-	return Peer{Name: name, Address: address, PublicKey: publicKey, ConfigPath: path}, nil
+	clientValues, err := parseSection(config, "Peer")
+	if err != nil {
+		return Peer{}, err
+	}
+	return Peer{Name: name, Address: address, PublicKey: publicKey, ConfigPath: path, Mode: modeFromAllowedIPs(clientValues["allowedips"])}, nil
 }
 
 func (m Manager) peerPath(name string) (string, error) {

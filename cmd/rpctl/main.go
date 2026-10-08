@@ -87,6 +87,7 @@ func help() {
   rpctl wg peer list
   rpctl wg peer add [NAME] [--ip-last-octet NUMBER]
   rpctl wg peer show NAME
+  rpctl wg peer mode NAME private|full
   rpctl wg peer delete NAME
   rpctl tailscale status
   rpctl update
@@ -322,7 +323,7 @@ func wgCommand(args []string) error {
 		return cmd.Run()
 	}
 	if len(args) < 2 || args[0] != "peer" {
-		return errors.New("usage: rpctl wg status|peer list|peer add [NAME] [--ip-last-octet NUMBER]|peer show NAME|peer delete NAME")
+		return errors.New("usage: rpctl wg status|peer list|peer add [NAME] [--ip-last-octet NUMBER]|peer show NAME|peer mode NAME private|full|peer delete NAME")
 	}
 	if err := root(); err != nil {
 		return err
@@ -341,9 +342,9 @@ func wgCommand(args []string) error {
 			fmt.Println("No managed WireGuard peers.")
 			return nil
 		}
-		fmt.Printf("%-20s %-18s %s\n", "NAME", "VPN ADDRESS", "CLIENT CONFIG")
+		fmt.Printf("%-20s %-18s %-10s %s\n", "NAME", "VPN ADDRESS", "MODE", "CLIENT CONFIG")
 		for _, peer := range peers {
-			fmt.Printf("%-20s %-18s %s\n", peer.Name, peer.Address, peer.ConfigPath)
+			fmt.Printf("%-20s %-18s %-10s %s\n", peer.Name, peer.Address, peer.Mode, peer.ConfigPath)
 		}
 		return nil
 	case "add":
@@ -368,7 +369,20 @@ func wgCommand(args []string) error {
 		}
 		fmt.Println("Name:", peer.Name)
 		fmt.Println("VPN address:", peer.Address)
+		fmt.Println("Mode:", peer.Mode)
 		fmt.Println("Public key:", peer.PublicKey)
+		fmt.Println("Client configuration:", peer.ConfigPath)
+		return nil
+	case "mode":
+		if len(args) != 4 {
+			return errors.New("usage: rpctl wg peer mode NAME private|full")
+		}
+		peer, err := manager.SetPeerMode(args[2], args[3])
+		if err != nil {
+			return err
+		}
+		fmt.Printf("WireGuard peer %s mode: %s\n", peer.Name, peer.Mode)
+		fmt.Println("Deactivate the device tunnel, import its updated .conf file or scan its new QR code, then reactivate it.")
 		fmt.Println("Client configuration:", peer.ConfigPath)
 		return nil
 	case "delete":
@@ -1008,7 +1022,7 @@ func menu(s proxy.Store) error {
 
 func wireGuardPeerMenu(reader *bufio.Reader) error {
 	fmt.Print("\n---------------- WireGuard peers ----------------\n")
-	fmt.Print("1. List peers\n2. Add peer\n3. Show peer\n4. Delete peer\n0. Back\n")
+	fmt.Print("1. List peers\n2. Add peer\n3. Show peer\n4. Delete peer\n5. Change peer mode\n0. Back\n")
 	fmt.Print("-------------------------------------------------\nChoice: ")
 	choice, err := reader.ReadString('\n')
 	if err != nil {
@@ -1041,6 +1055,22 @@ func wireGuardPeerMenu(reader *bufio.Reader) error {
 			return nil
 		}
 		return wgCommand([]string{"peer", "delete", name})
+	case "5":
+		name := strings.TrimSpace(prompt(reader, "Peer name: "))
+		choice := strings.TrimSpace(prompt(reader, "Mode: 1) Private network  2) Full tunnel [1]: "))
+		mode := wireguard.ModePrivate
+		if choice == "2" {
+			mode = wireguard.ModeFull
+		} else if choice != "" && choice != "1" {
+			return errors.New("mode choice must be 1 or 2")
+		}
+		fmt.Println("After changing mode, deactivate the device tunnel, import the updated .conf file or scan its new QR code, then reactivate it.")
+		confirm := strings.ToLower(prompt(reader, "Change mode and update the device configuration? [y/N]: "))
+		if confirm != "y" && confirm != "yes" {
+			fmt.Println("Mode change cancelled.")
+			return nil
+		}
+		return wgCommand([]string{"peer", "mode", name, mode})
 	default:
 		return errors.New("unknown WireGuard peer choice")
 	}

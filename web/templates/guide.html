@@ -231,6 +231,7 @@ curl -I -H 'Host: api.example.com' http://10.10.10.3:80</code></pre>
       </ol>
       <p>The QR code and downloaded configuration both contain the peer's private key. Do not capture, share, or reuse either one on another device. Delete downloaded configuration files after importing them.</p>
       <p>Private mode routes only <code>10.10.10.0/24</code> through WireGuard, so normal Internet traffic continues to use the device's regular connection.</p>
+      <p>To use VPS-1's public IPv4 address for Internet access, select the peer's <strong>Mode</strong> switch on Dashboard and confirm <strong>Full tunnel</strong>. Deactivate the device tunnel, replace it with the updated <code>.conf</code> file or scan the new QR code, and reactivate it. Switching back to <strong>Private network</strong> requires the same device update. Each peer can use a different mode. Full tunnel routes IPv4; IPv6 keeps the device's normal connection.</p>
     </section>
 
     <section>

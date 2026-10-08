@@ -62,16 +62,18 @@
           <colgroup>
             <col class="peer-name-column">
             <col class="peer-address-column">
+            <col class="peer-mode-column">
             <col class="peer-qr-column">
             <col class="peer-config-column">
             <col class="peer-actions-column">
           </colgroup>
-          <thead><tr><th>Name</th><th>VPN address</th><th>QR</th><th>Client configuration</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Name</th><th>VPN address</th><th>Mode</th><th>QR</th><th>Client configuration</th><th>Actions</th></tr></thead>
           <tbody>
           {{range .Peers}}
             <tr>
               <td data-label="Name">{{.Name}}</td>
               <td data-label="VPN address"><code>{{.Address}}</code></td>
+              <td data-label="Mode" class="peer-mode-cell"><button type="button" class="peer-mode-switch" role="switch" aria-checked="{{if eq .Mode "full"}}true{{else}}false{{end}}" aria-label="Full tunnel for {{.Name}}" aria-haspopup="dialog" data-mode-peer="{{.Name}}" data-peer-mode="{{if eq .Mode "full"}}full{{else}}private{{end}}"><span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span><span>{{if eq .Mode "full"}}Full tunnel{{else}}Private network{{end}}</span></button></td>
               <td data-label="QR" class="qr-cell"><button type="button" class="qr-view-button" data-qr-peer="{{.Name}}" aria-haspopup="dialog">View QR</button></td>
               <td data-label="Configuration" class="peer-config-cell"><code>{{.ConfigPath}}</code></td>
               <td data-label="Actions" class="actions-cell peer-actions-cell"><div class="actions-content peer-actions">
@@ -80,11 +82,12 @@
               </div></td>
             </tr>
           {{else}}
-            <tr><td class="empty" colspan="5">No managed WireGuard peers.</td></tr>
+            <tr><td class="empty" colspan="6">No managed WireGuard peers.</td></tr>
           {{end}}
           </tbody>
         </table>
       </div>
+      <p class="peer-mode-hint">The mode switch updates the saved configuration. After each change, import the new .conf file or scan the new QR code on the device, then reactivate its tunnel.</p>
       <div class="peer-help">
         <ul>
           <li><strong>Name:</strong> the name of the newly added device.</li>
@@ -110,6 +113,27 @@
           <img id="wireguard-qr-image" hidden alt="">
         </div>
         <p class="qr-security-note">This QR code contains the peer's private key. Scan it only with the intended device.</p>
+      </div>
+    </dialog>
+    <dialog class="mode-dialog" id="wireguard-mode-dialog" aria-labelledby="wireguard-mode-title">
+      <div class="qr-dialog-content">
+        <h2 id="wireguard-mode-title">Change WireGuard mode</h2>
+        <p>Change <strong id="wireguard-mode-peer"></strong> to <strong id="wireguard-mode-target"></strong>?</p>
+        <p id="wireguard-mode-description"></p>
+        <div class="guide-note"><strong>Update the device after changing mode.</strong> The device keeps its current settings until you replace its configuration.</div>
+        <ol>
+          <li>Download the new <code>.conf</code> file, or open <strong>View QR</strong> on another screen.</li>
+          <li>Deactivate the device's existing tunnel. Import the downloaded file or scan the new QR code to replace its configuration.</li>
+          <li>Activate the updated tunnel.</li>
+        </ol>
+        <p>The VPN address and keys stay the same. This changes the saved client routes; review any custom routes before replacing the device configuration.</p>
+        <form method="post" action="/wireguard/peer/mode" id="wireguard-mode-form">
+          <input type="hidden" name="csrf" value="{{.CSRF}}">
+          <input type="hidden" name="peer" id="wireguard-mode-input-peer">
+          <input type="hidden" name="mode" id="wireguard-mode-input-mode">
+          <label class="mode-confirm"><input type="checkbox" name="confirmed" value="yes" required id="wireguard-mode-confirm">I will update the device configuration or scan its new QR code.</label>
+          <div class="mode-dialog-actions"><button type="button" class="secondary" id="wireguard-mode-cancel">Cancel</button><button type="submit" id="wireguard-mode-submit">Change mode</button></div>
+        </form>
       </div>
     </dialog>
     {{else if eq .VPNMode "tailscale"}}
@@ -195,7 +219,7 @@
           <tbody>
           {{range .Sites}}
             <tr>
-              <td data-label="Domain">{{.Domain}}</td><td data-label="Upstream"><code>{{.Upstream}}</code></td>
+              <td data-label="Domain"><a href="{{if .SSLEnabled}}https{{else}}http{{end}}://{{.Domain}}" target="_blank" rel="noopener noreferrer">{{.Domain}}</a></td><td data-label="Upstream"><code>{{.Upstream}}</code></td>
               <td data-label="State">{{if .Enabled}}enabled{{else}}disabled{{end}}</td>
               <td data-label="SSL" class="ssl-cell">
                 <div class="ssl-content">

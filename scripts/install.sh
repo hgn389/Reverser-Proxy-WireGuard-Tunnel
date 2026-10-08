@@ -800,8 +800,7 @@ if [[ $tailscale_repo_new == yes ]]; then
 fi
 apt-get update
 packages=(nginx ca-certificates)
-if [[ $wireguard == yes ]]; then packages+=(wireguard-tools); fi
-if [[ $wireguard_mode == full ]]; then packages+=(iptables); fi
+if [[ $wireguard == yes ]]; then packages+=(wireguard-tools iptables); fi
 if [[ $tailscale_package_needed == yes ]]; then packages+=(tailscale); fi
 apt-get install -y --no-install-recommends "${packages[@]}"
 

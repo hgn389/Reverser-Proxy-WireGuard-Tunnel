@@ -28,6 +28,7 @@ type PrivilegedRequest struct {
 	Upstream       string `json:"upstream,omitempty"`
 	Peer           string `json:"peer,omitempty"`
 	VPNIPLastOctet int    `json:"vpn_ip_last_octet,omitempty"`
+	Mode           string `json:"mode,omitempty"`
 }
 
 type privilegedResponse struct {
@@ -46,6 +47,9 @@ type certificateStatus struct {
 }
 
 func (r PrivilegedRequest) Validate() error {
+	if r.Mode != "" && r.Operation != "wg_peer_mode" {
+		return errors.New("mode is allowed only when changing a WireGuard peer mode")
+	}
 	if r.VPNIPLastOctet != 0 && r.Operation != "wg_peer_add" {
 		return errors.New("VPN IP Local is allowed only when adding a WireGuard peer")
 	}
@@ -89,6 +93,14 @@ func (r PrivilegedRequest) Validate() error {
 			return fmt.Errorf("%s accepts only a peer name", r.Operation)
 		}
 		return wireguard.ValidatePeerName(r.Peer)
+	case "wg_peer_mode":
+		if r.Domain != "" || r.Upstream != "" {
+			return errors.New("wg_peer_mode accepts only a peer name and mode")
+		}
+		if err := wireguard.ValidatePeerName(r.Peer); err != nil {
+			return err
+		}
+		return wireguard.ValidatePeerMode(r.Mode)
 	default:
 		return errors.New("operation is not allowed")
 	}
@@ -282,6 +294,14 @@ func servePrivilegedOnce(reader io.Reader, writer io.Writer, store proxy.Store, 
 			}
 		case "wg_peer_delete":
 			operationErr = wireguard.DefaultManager().Delete(request.Peer)
+		case "wg_peer_mode":
+			var peer wireguard.Peer
+			peer, operationErr = wireguard.DefaultManager().SetPeerMode(request.Peer, request.Mode)
+			if operationErr == nil {
+				var encoded []byte
+				encoded, operationErr = json.Marshal(peer)
+				responseData = string(encoded)
+			}
 		case "wg_peer_config":
 			var config []byte
 			config, operationErr = wireguard.DefaultManager().Config(request.Peer)

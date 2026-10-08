@@ -10,6 +10,13 @@ This v1.0.11 installer supports **Ubuntu Server 22.04 LTS and 24.04 LTS** on `am
 sudo apt update && sudo apt install -y ca-certificates curl git && git clone https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel.git rpctl && cd rpctl && sudo bash scripts/install.sh
 ```
 
+When the installer asks `WireGuard mode: 1) private network  2) full tunnel [1]:`, choose:
+
+1. **Private network:** Only traffic to the WireGuard VPN subnet goes through the tunnel. Use `1` or press Enter for reverse proxies and access to services on VPN devices. Normal Internet traffic uses the device's Wi-Fi, mobile data, or other regular connection.
+2. **Full tunnel:** All Internet **IPv4** traffic goes through VPS-1. Websites reached over IPv4 see VPS-1's public IPv4 address. Choose `2` when you want a phone or computer to use VPS-1 for Internet access. IPv6 continues to use the device's normal connection.
+
+You can later change each peer's mode independently with the Web Panel mode switch. After changing mode, import that peer's updated `.conf` file or scan its new QR code on the device, then reactivate its tunnel.
+
 Save the Web Panel access details shown at the end of the installation. Example:
 
 ```text
@@ -663,6 +670,8 @@ sudo rpctl wg peer add
 sudo rpctl wg peer add home-server
 sudo rpctl wg peer add home-server-25 --ip-last-octet 25
 sudo rpctl wg peer show home-server
+sudo rpctl wg peer mode home-server full
+sudo rpctl wg peer mode home-server private
 sudo rpctl wg peer delete home-server
 sudo rpctl tailscale status
 ```
@@ -720,6 +729,8 @@ sudo rpctl web public-access disable
 ```
 
 When UFW is active, rpctl adds port `9080/tcp` only while direct access is enabled and removes only the rule marked as managed by rpctl. A domain and IP:port can remain active together. The Dashboard shows the direct URL beside **Webpanel Dashboard** while it is enabled.
+
+In **Reverse proxies**, click a domain to open it in a new browser tab. The link uses HTTPS when SSL is enabled for that domain, or HTTP otherwise.
 
 The panel provides the VPS and VPN addresses, CPU, RAM, swap, SSD and uptime summaries, managed proxy CRUD, per-domain SSL controls, controlled Nginx restart and VPS reboot actions, and an authenticated **Configuration Guide**. In WireGuard mode it provides peer creation/deletion, configuration downloads and QR codes. In Tailscale mode it displays the local identity, tailnet and device status returned by `tailscale status --json`, with a link to the Tailscale Admin Console for device approval and policy management.
 
@@ -816,6 +827,33 @@ The terminal menu exposes the same actions under item `13. WireGuard peers`. Whe
 For example, entering `25` creates `10.10.10.25/32` on the default subnet, or `192.168.150.25/32` when VPS-1 uses `192.168.150.1/24`. The first three numbers come from VPS-1's WireGuard address. An address must belong to the configured subnet and cannot be a server interface address, a network or broadcast address, or an address already assigned to another peer. Both manual and automatic allocation also reserve any address ranges in existing server-side peer `AllowedIPs`. On the default `/24`, `.1` belongs to VPS-1 and peers can use `.2` through `.254` when free. Smaller subnets offer fewer valid choices; for `10.10.10.0/30`, only `.2` is available to a peer, and the initial `client1` already uses it. These settings apply when creating a new peer; they do not change an existing peer's address.
 
 The Web Panel can also download each `.conf` file, open one peer's QR code in a popup, and delete peers. It explains the device name, assigned VPN address, configuration download, and mobile QR workflow below the peer table. QR codes stay hidden until **View QR** is selected, which keeps other peer codes out of the scanner view. A downloaded configuration or displayed QR code contains a private key and must be protected like a password. Deleting a peer removes it from the live interface and invalidates its client configuration immediately.
+
+### Change a peer between Private network and Full tunnel
+
+In **WireGuard peers - Add a device**, use the switch in the **Mode** column for the device you want to change. A switch that is off represents **Private network**; an on switch represents **Full tunnel**. The switch opens a confirmation dialog before applying the change. Cancel closes the dialog without changing the configuration.
+
+After confirming a change:
+
+1. Download the updated `.conf` file, or open **View QR** on another screen, while you still have access to the Web Panel.
+2. Deactivate the existing WireGuard tunnel on the device. Import the downloaded file or scan the new QR code to replace its configuration. Replace the existing tunnel rather than running the old and updated configurations together.
+3. Activate the updated tunnel.
+
+The Web Panel does not push settings into an already installed WireGuard app. The file and QR code are updated on VPS-1; the device continues using its previous settings until you update it. The peer's VPN address, keys, and endpoint stay the same. Its client `AllowedIPs` becomes the server's VPN subnet for Private network or `0.0.0.0/0` for Full tunnel, replacing any custom client routes. The server-side peer `AllowedIPs` keeps the peer's original address.
+
+Full tunnel enables IPv4 forwarding and subnet-scoped forwarding/NAT rules on VPS-1. The rules take effect immediately and are saved in the WireGuard server configuration for subsequent interface starts. VPS-1's WireGuard interface is not restarted when you change a peer mode. Switching one peer back to Private network keeps server routing available for other Full tunnel peers. For example, an iPhone can use Full tunnel while VPS-2 uses Private network. This is a client routing preference; it is not a firewall restriction preventing a device from changing its own routes.
+
+If a Full tunnel client has no DNS setting, the updated configuration includes `1.1.1.1` and `8.8.8.8`. Existing custom DNS settings are preserved. DNS added by rpctl for Full tunnel is removed when that peer returns to Private network. Linux clients using `wg-quick` need a working `resolvconf` command for the DNS setting; on Ubuntu, install it with `sudo apt install -y resolvconf` before activating the updated Full tunnel configuration.
+
+New WireGuard installations include `iptables` for mode switching. On an older installation where it is missing, run `sudo apt update && sudo apt install -y iptables` on VPS-1 before selecting Full tunnel. Forwarding does not replace provider or local firewall policy; the VPS must allow the desired IPv4 Internet traffic.
+
+The CLI and terminal menu provide the same feature:
+
+```bash
+sudo rpctl wg peer mode iphone full
+sudo rpctl wg peer mode iphone private
+```
+
+In `sudo rp`, select **13. WireGuard peers**, then **5. Change peer mode**. New peers continue using the installation's original default mode; changing an existing peer does not change that default.
 
 ### Windows, iPhone, iPad, and Android clients
 

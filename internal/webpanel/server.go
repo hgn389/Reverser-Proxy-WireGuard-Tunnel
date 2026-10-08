@@ -179,6 +179,7 @@ func (s *Server) Handler() (http.Handler, error) {
 	mux.Handle("POST /ssl/renew", s.auth(s.csrf(http.HandlerFunc(s.sslRenew))))
 	mux.Handle("POST /wireguard/peer/add", s.auth(s.csrf(http.HandlerFunc(s.wgPeerAdd))))
 	mux.Handle("POST /wireguard/peer/delete", s.auth(s.csrf(http.HandlerFunc(s.wgPeerDelete))))
+	mux.Handle("POST /wireguard/peer/mode", s.auth(s.csrf(http.HandlerFunc(s.wgPeerMode))))
 	mux.Handle("POST /wireguard/peer/download", s.auth(s.csrf(http.HandlerFunc(s.wgPeerDownload))))
 	mux.Handle("GET /wireguard/peer/qr", s.auth(http.HandlerFunc(s.wgPeerQR)))
 	mux.Handle("POST /system/nginx-restart", s.auth(s.csrf(http.HandlerFunc(s.nginxRestart))))
@@ -531,6 +532,33 @@ func (s *Server) wgPeerAdd(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("AUDIT user=%q action=%q peer=%q", s.config.Username, request.Operation, peer.Name)
 	redirectMessage(w, r, fmt.Sprintf("WireGuard peer %s created with address %s.", peer.Name, peer.Address))
+}
+
+func (s *Server) wgPeerMode(w http.ResponseWriter, r *http.Request) {
+	request := PrivilegedRequest{Operation: "wg_peer_mode", Peer: strings.TrimSpace(r.FormValue("peer")), Mode: strings.TrimSpace(r.FormValue("mode"))}
+	if err := request.Validate(); err != nil {
+		redirectMessage(w, r, "ERROR: "+err.Error())
+		return
+	}
+	if r.FormValue("confirmed") != "yes" {
+		redirectMessage(w, r, "ERROR: Confirm that you will update the device configuration or scan its new QR code.")
+		return
+	}
+	client, ok := s.privileged.(PrivilegedDataClient)
+	if !ok {
+		redirectMessage(w, r, "ERROR: WireGuard peer management is unavailable")
+		return
+	}
+	if _, err := client.ExecuteData(request); err != nil {
+		redirectMessage(w, r, "ERROR: "+err.Error())
+		return
+	}
+	label := "Private network"
+	if request.Mode == wireguard.ModeFull {
+		label = "Full tunnel"
+	}
+	log.Printf("AUDIT user=%q action=%q peer=%q mode=%q", s.config.Username, request.Operation, request.Peer, request.Mode)
+	redirectMessage(w, r, fmt.Sprintf("Peer %s is now configured for %s. Update its device: download and import the new .conf file or scan the new QR code, then reactivate the tunnel.", request.Peer, label))
 }
 
 func (s *Server) wgPeerDelete(w http.ResponseWriter, r *http.Request) {

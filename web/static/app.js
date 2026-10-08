@@ -53,6 +53,48 @@
     });
   };
 
+  const setupWireGuardMode = () => {
+    const dialog = document.querySelector("#wireguard-mode-dialog");
+    const form = document.querySelector("#wireguard-mode-form");
+    if (!dialog || !form) return;
+    const peerLabel = document.querySelector("#wireguard-mode-peer");
+    const targetLabel = document.querySelector("#wireguard-mode-target");
+    const description = document.querySelector("#wireguard-mode-description");
+    const peerInput = document.querySelector("#wireguard-mode-input-peer");
+    const modeInput = document.querySelector("#wireguard-mode-input-mode");
+    const confirm = document.querySelector("#wireguard-mode-confirm");
+    const submit = document.querySelector("#wireguard-mode-submit");
+    document.querySelectorAll("[data-mode-peer]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const full = button.dataset.peerMode !== "full";
+        peerLabel.textContent = button.dataset.modePeer;
+        targetLabel.textContent = full ? "Full tunnel" : "Private network";
+        description.textContent = full
+          ? "Internet IPv4 traffic will use VPS-1's public IPv4 address. VPS-1 will enable IPv4 forwarding and NAT for the WireGuard subnet. IPv6 is not routed by this mode."
+          : "Only traffic to the WireGuard subnet will use the VPN. Internet traffic will use the device's normal connection.";
+        peerInput.value = button.dataset.modePeer;
+        modeInput.value = full ? "full" : "private";
+        confirm.checked = false;
+        submit.disabled = false;
+        submit.textContent = "Change mode";
+        dialog.showModal();
+      });
+    });
+    document.querySelector("#wireguard-mode-cancel").addEventListener("click", () => dialog.close());
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+    dialog.addEventListener("close", () => {
+      confirm.checked = false;
+      peerInput.value = "";
+      modeInput.value = "";
+    });
+    form.addEventListener("submit", () => {
+      submit.disabled = true;
+      submit.textContent = "Changing mode...";
+    });
+  };
+
   const setupUpdateNotification = () => {
     const banner = document.querySelector("#update-banner");
     const version = document.querySelector("#update-version");
@@ -147,5 +189,6 @@
   };
 
   setupWireGuardQR();
+  setupWireGuardMode();
   setupUpdateNotification();
 })();
