@@ -4,11 +4,24 @@
 
 ### 1. VPS-1 — Reverse Proxy
 
-This v1.0.9 installer supports **Ubuntu Server 22.04 LTS and 24.04 LTS** on `amd64` and `arm64`. Run this command on a clean VPS:
+This v1.0.10 installer supports **Ubuntu Server 22.04 LTS and 24.04 LTS** on `amd64` and `arm64`. Run this command on a clean VPS:
 
 ```bash
 sudo apt update && sudo apt install -y ca-certificates curl git && git clone https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel.git rpctl && cd rpctl && sudo bash scripts/install.sh
 ```
+
+Save the Web Panel access details shown at the end of the installation. Example:
+
+```text
+############################
+https://rp.domain.com
+http://SERVER_IP:9080
+Username: admin
+Password: ************
+############################
+```
+
+Replace `rp.domain.com`, `SERVER_IP`, and `admin` with the domain, public IP address, and administrator username entered during setup. The direct IP address uses port `9080`.
 
 The same command is used on Ubuntu 22.04 and Ubuntu 24.04. If an existing checkout reports `Only Ubuntu Server 24.04 is supported`, it contains an installer older than v1.0.2. Update that checkout and confirm the corrected platform check before running it again:
 
@@ -19,7 +32,7 @@ grep -n 'ubuntu:22.04' scripts/install.sh
 sudo bash scripts/install.sh
 ```
 
-The `grep` command must show `ubuntu:22.04|ubuntu:24.04`. The installer then downloads the latest GitHub Release, so the repository owner must publish the v1.0.9 release assets before this installation is used.
+The `grep` command must show `ubuntu:22.04|ubuntu:24.04`. The installer then downloads the latest GitHub Release, so the repository owner must publish the v1.0.10 release assets before this installation is used.
 
 The installer first asks for a VPN backend:
 
