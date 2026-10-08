@@ -85,7 +85,7 @@ func help() {
   rpctl system recover
   rpctl wg status
   rpctl wg peer list
-  rpctl wg peer add [NAME]
+  rpctl wg peer add [NAME] [--ip-last-octet NUMBER]
   rpctl wg peer show NAME
   rpctl wg peer delete NAME
   rpctl tailscale status
@@ -272,6 +272,42 @@ func tailscaleCommand(args []string) error {
 	return nil
 }
 
+func parsePeerAddArgs(args []string) (string, int, error) {
+	var name string
+	var lastOctet int
+	var hasLastOctet bool
+	for index := 0; index < len(args); index++ {
+		argument := args[index]
+		if argument == "--ip-last-octet" || strings.HasPrefix(argument, "--ip-last-octet=") {
+			if hasLastOctet {
+				return "", 0, errors.New("--ip-last-octet may be specified only once")
+			}
+			value := strings.TrimPrefix(argument, "--ip-last-octet=")
+			if argument == "--ip-last-octet" {
+				index++
+				if index >= len(args) {
+					return "", 0, errors.New("--ip-last-octet requires a whole number from 1 to 254")
+				}
+				value = args[index]
+			}
+			parsed, err := wireguard.ParseLastOctet(value)
+			if err != nil || parsed == 0 {
+				return "", 0, errors.New("--ip-last-octet requires a whole number from 1 to 254")
+			}
+			lastOctet, hasLastOctet = parsed, true
+			continue
+		}
+		if name != "" || strings.HasPrefix(argument, "-") {
+			return "", 0, errors.New("usage: rpctl wg peer add [NAME] [--ip-last-octet NUMBER]")
+		}
+		if err := wireguard.ValidatePeerName(argument); err != nil {
+			return "", 0, err
+		}
+		name = argument
+	}
+	return name, lastOctet, nil
+}
+
 func wgCommand(args []string) error {
 	if len(args) == 1 && args[0] == "status" {
 		if err := root(); err != nil {
@@ -286,7 +322,7 @@ func wgCommand(args []string) error {
 		return cmd.Run()
 	}
 	if len(args) < 2 || args[0] != "peer" {
-		return errors.New("usage: rpctl wg status|peer list|peer add [NAME]|peer show NAME|peer delete NAME")
+		return errors.New("usage: rpctl wg status|peer list|peer add [NAME] [--ip-last-octet NUMBER]|peer show NAME|peer delete NAME")
 	}
 	if err := root(); err != nil {
 		return err
@@ -311,14 +347,11 @@ func wgCommand(args []string) error {
 		}
 		return nil
 	case "add":
-		if len(args) > 3 {
-			return errors.New("usage: rpctl wg peer add [NAME]")
+		name, lastOctet, err := parsePeerAddArgs(args[2:])
+		if err != nil {
+			return err
 		}
-		name := ""
-		if len(args) == 3 {
-			name = args[2]
-		}
-		peer, err := manager.Add(name)
+		peer, err := manager.AddWithLastOctet(name, lastOctet)
 		if err != nil {
 			return err
 		}
@@ -988,9 +1021,13 @@ func wireGuardPeerMenu(reader *bufio.Reader) error {
 		return wgCommand([]string{"peer", "list"})
 	case "2":
 		name := strings.TrimSpace(prompt(reader, "Peer name (Enter = automatic): "))
+		lastOctet := strings.TrimSpace(prompt(reader, "VPN IP Local (last number, 1-254; Enter = automatic): "))
 		args := []string{"peer", "add"}
 		if name != "" {
 			args = append(args, name)
+		}
+		if lastOctet != "" {
+			args = append(args, "--ip-last-octet", lastOctet)
 		}
 		return wgCommand(args)
 	case "3":

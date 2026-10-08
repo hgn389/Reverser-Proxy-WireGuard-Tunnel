@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
+	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -92,6 +94,178 @@ func testManager(t *testing.T) (Manager, *fakeRunner) {
 		Runner:     runner,
 	}
 	return manager, runner
+}
+
+func TestAddWithLastOctet(t *testing.T) {
+	manager, _ := testManager(t)
+	peer, err := manager.AddWithLastOctet("iphone", 25)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if peer.Name != "iphone" || peer.Address != "10.77.0.25/32" {
+		t.Fatalf("unexpected peer: %+v", peer)
+	}
+	client, err := manager.Config("iphone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	server, err := os.ReadFile(manager.ConfigPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(client, []byte("Address = 10.77.0.25/32")) || !bytes.Contains(server, []byte("AllowedIPs = 10.77.0.25/32")) {
+		t.Fatal("the selected address was not written to both configurations")
+	}
+	if _, err := manager.AddWithLastOctet("another-phone", 25); err == nil {
+		t.Fatal("a duplicate address was accepted")
+	}
+}
+
+func TestAddWithLastOctetRejectsUnavailableAddressWithoutChanges(t *testing.T) {
+	for _, lastOctet := range []int{-1, 1, 2, 255, 256} {
+		t.Run(strconv.Itoa(lastOctet), func(t *testing.T) {
+			manager, _ := testManager(t)
+			before, err := os.ReadFile(manager.ConfigPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := manager.AddWithLastOctet("iphone", lastOctet); err == nil {
+				t.Fatal("an invalid or occupied address was accepted")
+			}
+			after, err := os.ReadFile(manager.ConfigPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(before, after) {
+				t.Fatal("rejected allocation changed the server configuration")
+			}
+			if _, err := os.Stat(filepath.Join(manager.PeerDir, "iphone.conf")); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("rejected allocation created a peer configuration: %v", err)
+			}
+		})
+	}
+}
+
+func TestPeerAllocationReservesAllowedIPRanges(t *testing.T) {
+	manager, _ := testManager(t)
+	before, err := os.ReadFile(manager.ConfigPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before = append(before, []byte("\n[Peer]\nPublicKey = "+testKey(23)+"\nAllowedIPs = 10.77.0.0/29, 192.168.150.0/24, 10.77.0.4/30\n")...)
+	if err := os.WriteFile(manager.ConfigPath, before, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.AddWithLastOctet("iphone", 5); err == nil || !strings.Contains(err.Error(), "already in use") {
+		t.Fatalf("an address inside an existing peer range was accepted: %v", err)
+	}
+	after, err := os.ReadFile(manager.ConfigPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("rejected allocation changed the server configuration")
+	}
+	peer, err := manager.Add("iphone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if peer.Address != "10.77.0.8/32" {
+		t.Fatalf("automatic allocation did not skip the reserved range: %+v", peer)
+	}
+}
+
+func TestPeerAllocationReservesAdditionalServerAddresses(t *testing.T) {
+	manager, _ := testManager(t)
+	config, err := os.ReadFile(manager.ConfigPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config = bytes.Replace(config, []byte("Address = 10.77.0.1/24"), []byte("Address = 10.77.0.1/24, 10.77.0.3/32"), 1)
+	if err := os.WriteFile(manager.ConfigPath, config, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.AddWithLastOctet("iphone", 3); err == nil {
+		t.Fatal("an additional server address was accepted")
+	}
+	peer, err := manager.Add("iphone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if peer.Address != "10.77.0.4/32" {
+		t.Fatalf("automatic allocation did not skip the server address: %+v", peer)
+	}
+}
+
+func TestUsedAddressesBoundsLargeAllowedIPRanges(t *testing.T) {
+	server, network, err := net.ParseCIDR("10.79.0.1/16")
+	if err != nil {
+		t.Fatal(err)
+	}
+	used, err := usedAddresses([]byte("[Peer]\nAllowedIPs = 0.0.0.0/0, 10.0.0.0/8\n"), nil, network)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(used) != 65536 {
+		t.Fatalf("reservation was not limited to the allocation subnet: %d addresses", len(used))
+	}
+	if _, err := nextAddress(network, server, used); err == nil {
+		t.Fatal("an address was allocated inside a fully reserved subnet")
+	}
+}
+
+func TestConcurrentManualPeerAllocation(t *testing.T) {
+	manager, _ := testManager(t)
+	results := make(chan error, 2)
+	for _, name := range []string{"iphone", "android"} {
+		go func() {
+			_, err := manager.AddWithLastOctet(name, 25)
+			results <- err
+		}()
+	}
+	successful := 0
+	for range 2 {
+		if err := <-results; err == nil {
+			successful++
+		} else if !strings.Contains(err.Error(), "already in use") {
+			t.Fatalf("unexpected allocation error: %v", err)
+		}
+	}
+	if successful != 1 {
+		t.Fatalf("the same address was allocated %d times", successful)
+	}
+}
+
+func TestAddressWithLastOctetUsesActualSubnet(t *testing.T) {
+	for _, test := range []struct {
+		server    string
+		lastOctet int
+		want      string
+	}{
+		{"192.168.150.1/24", 254, "192.168.150.254"},
+		{"10.79.3.1/16", 25, "10.79.3.25"},
+		{"10.79.0.100/24", 1, "10.79.0.1"},
+		{"10.79.0.5/30", 6, "10.79.0.6"},
+		{"10.79.0.5/30", 4, ""},
+		{"10.79.0.5/30", 7, ""},
+		{"10.79.0.5/30", 25, ""},
+		{"10.79.0.5/30", 5, ""},
+	} {
+		t.Run(test.server+"/"+strconv.Itoa(test.lastOctet), func(t *testing.T) {
+			server, network, err := net.ParseCIDR(test.server)
+			if err != nil {
+				t.Fatal(err)
+			}
+			address, err := addressWithLastOctet(network, server, map[uint32]struct{}{}, test.lastOctet)
+			if test.want == "" {
+				if err == nil {
+					t.Fatal("a reserved or out-of-subnet address was accepted")
+				}
+			} else if err != nil || address.String() != test.want {
+				t.Fatalf("address=%v error=%v; want %s", address, err, test.want)
+			}
+		})
+	}
 }
 
 func TestAddListConfigAndDeletePeer(t *testing.T) {

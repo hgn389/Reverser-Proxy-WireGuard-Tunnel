@@ -10,7 +10,7 @@ wireguard/peers/
 dist/
 dist.before-*/
 build/
-rpctl
+/rpctl
 rpctl-linux-*
 coverage.out
 coverage/

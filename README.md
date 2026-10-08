@@ -4,7 +4,7 @@
 
 ### 1. VPS-1 — Reverse Proxy
 
-This v1.0.10 installer supports **Ubuntu Server 22.04 LTS and 24.04 LTS** on `amd64` and `arm64`. Run this command on a clean VPS:
+This v1.0.11 installer supports **Ubuntu Server 22.04 LTS and 24.04 LTS** on `amd64` and `arm64`. Run this command on a clean VPS:
 
 ```bash
 sudo apt update && sudo apt install -y ca-certificates curl git && git clone https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel.git rpctl && cd rpctl && sudo bash scripts/install.sh
@@ -32,7 +32,7 @@ grep -n 'ubuntu:22.04' scripts/install.sh
 sudo bash scripts/install.sh
 ```
 
-The `grep` command must show `ubuntu:22.04|ubuntu:24.04`. The installer then downloads the latest GitHub Release, so the repository owner must publish the v1.0.10 release assets before this installation is used.
+The `grep` command must show `ubuntu:22.04|ubuntu:24.04`. The installer then downloads the latest GitHub Release, including the binary and its `SHA256SUMS` verification file.
 
 The installer first asks for a VPN backend:
 
@@ -661,6 +661,7 @@ sudo rpctl wg status
 sudo rpctl wg peer list
 sudo rpctl wg peer add
 sudo rpctl wg peer add home-server
+sudo rpctl wg peer add home-server-25 --ip-last-octet 25
 sudo rpctl wg peer show home-server
 sudo rpctl wg peer delete home-server
 sudo rpctl tailscale status
@@ -801,14 +802,20 @@ Private mode routes only `10.10.10.0/24`. Full mode enables IPv4 forwarding and 
 The default `/24` network provides addresses `10.10.10.2` through `10.10.10.254`, allowing up to 253 client peers after reserving `10.10.10.1` for VPS-1. `rpctl` finds the next free address automatically and creates a unique key pair and configuration for every peer:
 
 ```bash
-sudo rpctl wg peer add                 # Next automatic name and address
-sudo rpctl wg peer add orange-pi-2     # Custom peer name
+sudo rpctl wg peer add                  # Next automatic name and address
+sudo rpctl wg peer add orange-pi-2       # Custom name, automatic address
+sudo rpctl wg peer add iphone --ip-last-octet 25  # Custom name and address
+sudo rpctl wg peer add --ip-last-octet 50         # Automatic name, custom address
 sudo rpctl wg peer list
 sudo rpctl wg peer show orange-pi-2
 sudo rpctl wg peer delete orange-pi-2
 ```
 
-The terminal menu exposes the same actions under item `13. WireGuard peers`. The **WireGuard peers - Add a device** section in the Web Panel can create peers, download each `.conf` file, open one peer's QR code in a popup, and delete peers. It also explains the device name, assigned VPN address, configuration download, and mobile QR workflow below the peer table. QR codes stay hidden until **View QR** is selected, which keeps other peer codes out of the scanner view. A downloaded configuration or displayed QR code contains a private key and must be protected like a password. Deleting a peer removes it from the live interface and invalidates its client configuration immediately.
+The terminal menu exposes the same actions under item `13. WireGuard peers`. When adding a peer, the terminal menu and the **WireGuard peers - Add a device** section in the Web Panel offer **VPN IP Local (optional)** immediately after the peer name. Enter only the last number of the desired VPN address, from `1` to `254`, or leave it empty for the next free address. The CLI provides the same choice with `--ip-last-octet NUMBER`, before or after the optional peer name.
+
+For example, entering `25` creates `10.10.10.25/32` on the default subnet, or `192.168.150.25/32` when VPS-1 uses `192.168.150.1/24`. The first three numbers come from VPS-1's WireGuard address. An address must belong to the configured subnet and cannot be a server interface address, a network or broadcast address, or an address already assigned to another peer. Both manual and automatic allocation also reserve any address ranges in existing server-side peer `AllowedIPs`. On the default `/24`, `.1` belongs to VPS-1 and peers can use `.2` through `.254` when free. Smaller subnets offer fewer valid choices; for `10.10.10.0/30`, only `.2` is available to a peer, and the initial `client1` already uses it. These settings apply when creating a new peer; they do not change an existing peer's address.
+
+The Web Panel can also download each `.conf` file, open one peer's QR code in a popup, and delete peers. It explains the device name, assigned VPN address, configuration download, and mobile QR workflow below the peer table. QR codes stay hidden until **View QR** is selected, which keeps other peer codes out of the scanner view. A downloaded configuration or displayed QR code contains a private key and must be protected like a password. Deleting a peer removes it from the live interface and invalidates its client configuration immediately.
 
 ### Windows, iPhone, iPad, and Android clients
 

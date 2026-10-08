@@ -12,6 +12,39 @@ import (
 	"rpctl/internal/proxy"
 )
 
+func TestPeerAddArguments(t *testing.T) {
+	for _, test := range []struct {
+		args      []string
+		name      string
+		lastOctet int
+	}{
+		{nil, "", 0},
+		{[]string{"iphone"}, "iphone", 0},
+		{[]string{"iphone", "--ip-last-octet", "25"}, "iphone", 25},
+		{[]string{"--ip-last-octet", "25", "iphone"}, "iphone", 25},
+		{[]string{"--ip-last-octet=254"}, "", 254},
+	} {
+		name, lastOctet, err := parsePeerAddArgs(test.args)
+		if err != nil || name != test.name || lastOctet != test.lastOctet {
+			t.Errorf("args=%q name=%q lastOctet=%d error=%v", test.args, name, lastOctet, err)
+		}
+	}
+	for _, args := range [][]string{
+		{"--ip-last-octet"},
+		{"--ip-last-octet="},
+		{"--ip-last-octet", "0"},
+		{"--ip-last-octet", "255"},
+		{"--ip-last-octet", "1.5"},
+		{"--ip-last-octet", "25", "--ip-last-octet", "26"},
+		{"iphone", "another-phone"},
+		{"--unknown"},
+	} {
+		if _, _, err := parsePeerAddArgs(args); err == nil {
+			t.Errorf("invalid arguments accepted: %q", args)
+		}
+	}
+}
+
 func TestCommandArgumentValidation(t *testing.T) {
 	for _, args := range [][]string{
 		{"version", "extra"},

@@ -504,7 +504,12 @@ func (s *Server) wireGuardPeers() ([]wireguard.Peer, string) {
 }
 
 func (s *Server) wgPeerAdd(w http.ResponseWriter, r *http.Request) {
-	request := PrivilegedRequest{Operation: "wg_peer_add", Peer: strings.TrimSpace(r.FormValue("peer"))}
+	lastOctet, err := wireguard.ParseLastOctet(r.FormValue("vpn_ip_last_octet"))
+	if err != nil {
+		redirectMessage(w, r, "ERROR: "+err.Error())
+		return
+	}
+	request := PrivilegedRequest{Operation: "wg_peer_add", Peer: strings.TrimSpace(r.FormValue("peer")), VPNIPLastOctet: lastOctet}
 	if err := request.Validate(); err != nil {
 		redirectMessage(w, r, "ERROR: "+err.Error())
 		return

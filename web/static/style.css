@@ -55,7 +55,7 @@ h3 { margin: 1.25rem 0 .55rem; }
 .system-details dd { margin: 0; font-weight: 650; }
 
 .inline-form { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(280px, 2fr) auto; gap: .75rem; align-items: end; }
-.peer-form { display: grid; grid-template-columns: minmax(220px, 420px) auto; gap: .75rem; align-items: end; justify-content: start; }
+.peer-form { display: grid; grid-template-columns: minmax(180px, 420px) minmax(160px, 240px) auto; gap: .75rem; align-items: end; justify-content: start; }
 .form-hint { margin: .65rem 0 1rem; color: #8b949e; }
 label { display: grid; gap: .4rem; font-weight: 600; }
 input { width: 100%; padding: .7rem; border: 1px solid #484f58; border-radius: 6px; background: #0d1117; color: #e6edf3; }

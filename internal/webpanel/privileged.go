@@ -23,10 +23,11 @@ import (
 const maxPrivilegedResponseSize = 1 << 20
 
 type PrivilegedRequest struct {
-	Operation string `json:"operation"`
-	Domain    string `json:"domain,omitempty"`
-	Upstream  string `json:"upstream,omitempty"`
-	Peer      string `json:"peer,omitempty"`
+	Operation      string `json:"operation"`
+	Domain         string `json:"domain,omitempty"`
+	Upstream       string `json:"upstream,omitempty"`
+	Peer           string `json:"peer,omitempty"`
+	VPNIPLastOctet int    `json:"vpn_ip_last_octet,omitempty"`
 }
 
 type privilegedResponse struct {
@@ -45,6 +46,9 @@ type certificateStatus struct {
 }
 
 func (r PrivilegedRequest) Validate() error {
+	if r.VPNIPLastOctet != 0 && r.Operation != "wg_peer_add" {
+		return errors.New("VPN IP Local is allowed only when adding a WireGuard peer")
+	}
 	switch r.Operation {
 	case "proxy_add", "proxy_edit":
 		if r.Peer != "" {
@@ -71,7 +75,10 @@ func (r PrivilegedRequest) Validate() error {
 		return nil
 	case "wg_peer_add":
 		if r.Domain != "" || r.Upstream != "" {
-			return errors.New("wg_peer_add accepts only a peer name")
+			return errors.New("wg_peer_add accepts only a peer name and VPN IP Local")
+		}
+		if r.VPNIPLastOctet < 0 || r.VPNIPLastOctet > 254 {
+			return errors.New("VPN IP Local must be a whole number from 1 to 254")
 		}
 		if r.Peer == "" {
 			return nil
@@ -267,7 +274,7 @@ func servePrivilegedOnce(reader io.Reader, writer io.Writer, store proxy.Store, 
 			}
 		case "wg_peer_add":
 			var peer wireguard.Peer
-			peer, operationErr = wireguard.DefaultManager().Add(request.Peer)
+			peer, operationErr = wireguard.DefaultManager().AddWithLastOctet(request.Peer, request.VPNIPLastOctet)
 			if operationErr == nil {
 				var encoded []byte
 				encoded, operationErr = json.Marshal(peer)

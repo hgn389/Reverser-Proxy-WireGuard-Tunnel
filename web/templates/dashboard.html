@@ -50,9 +50,10 @@
       <form class="peer-form" method="post" action="/wireguard/peer/add">
         <input type="hidden" name="csrf" value="{{.CSRF}}">
         <label>Peer name (optional)<input name="peer" placeholder="client2" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,31}" maxlength="32"></label>
+        <label>VPN IP Local (optional)<input name="vpn_ip_last_octet" type="number" min="1" max="254" step="1" inputmode="numeric" placeholder="Automatic"></label>
         <button type="submit">Create peer</button>
       </form>
-      <p class="form-hint">Leave the name empty to create the next client automatically. Every peer receives a unique VPN address and configuration. Each QR code contains that peer's private key; show it only to the intended device.</p>
+      <p class="form-hint">Leave the name empty to create the next client automatically. VPN IP Local selects the last number of the VPN address (1–254); for example, 25 creates 10.10.10.25 on the default subnet. Leave it empty for automatic allocation. Server, reserved, and occupied addresses cannot be used. Each QR code contains that peer's private key; show it only to the intended device.</p>
       {{if .PeerError}}
       <div class="alert error">{{.PeerError}}</div>
       {{else}}

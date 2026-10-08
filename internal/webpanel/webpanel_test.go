@@ -200,6 +200,8 @@ func TestPrivilegedRequestValidation(t *testing.T) {
 		{Operation: "wg_peer_list"},
 		{Operation: "wg_peer_add"},
 		{Operation: "wg_peer_add", Peer: "origin-3"},
+		{Operation: "wg_peer_add", VPNIPLastOctet: 25},
+		{Operation: "wg_peer_add", Peer: "iphone", VPNIPLastOctet: 254},
 		{Operation: "wg_peer_delete", Peer: "origin-3"},
 		{Operation: "wg_peer_config", Peer: "origin-3"},
 	}
@@ -217,6 +219,10 @@ func TestPrivilegedRequestValidation(t *testing.T) {
 		{Operation: "ssl_status_all", Domain: "app.example.com"},
 		{Operation: "wg_peer_list", Peer: "client2"},
 		{Operation: "wg_peer_add", Peer: "../client2"},
+		{Operation: "wg_peer_add", VPNIPLastOctet: -1},
+		{Operation: "wg_peer_add", VPNIPLastOctet: 255},
+		{Operation: "wg_peer_delete", Peer: "iphone", VPNIPLastOctet: 25},
+		{Operation: "system_update", VPNIPLastOctet: 25},
 		{Operation: "wg_peer_delete"},
 		{Operation: "proxy_delete", Domain: "app.example.com", Peer: "client2"},
 	}
@@ -627,6 +633,44 @@ func TestBuildDashboardSitesFormatsCertificateDays(t *testing.T) {
 	}
 	if rows[3].SSLDays != "Expired" || rows[3].SSLDaysClass != "expired" {
 		t.Fatalf("expired row: %+v", rows[3])
+	}
+}
+
+func TestWireGuardPeerAddLastOctet(t *testing.T) {
+	client := &recordingClient{data: map[string]string{
+		"wg_peer_add": `{"name":"iphone","address":"10.10.10.25/32"}`,
+	}}
+	server, err := NewServer(testConfig(t), "test", testStore(t), client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range []string{"", "25", "1", "254", "0", "255", "-1", "25.5", "10.10.10.25", "1e2", "abc", "999999999999999999999999999"} {
+		t.Run(value, func(t *testing.T) {
+			client.requests = nil
+			response := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, "https://panel.example.com/wireguard/peer/add", strings.NewReader(url.Values{
+				"peer": {"iphone"}, "vpn_ip_last_octet": {value},
+			}.Encode()))
+			request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			server.wgPeerAdd(response, request)
+			valid := value == "" || value == "25" || value == "1" || value == "254"
+			if response.Code != http.StatusSeeOther {
+				t.Fatalf("status=%d", response.Code)
+			}
+			if !valid {
+				if len(client.requests) != 0 || !strings.Contains(response.Header().Get("Location"), "ERROR") {
+					t.Fatalf("invalid input reached helper: %+v", client.requests)
+				}
+				return
+			}
+			want := 0
+			if value != "" {
+				want, _ = strconv.Atoi(value)
+			}
+			if len(client.requests) != 1 || client.requests[0].VPNIPLastOctet != want || client.requests[0].Peer != "iphone" {
+				t.Fatalf("requests=%+v; want last octet %d", client.requests, want)
+			}
+		})
 	}
 }
 

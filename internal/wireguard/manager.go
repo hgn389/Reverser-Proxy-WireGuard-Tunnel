@@ -171,6 +171,14 @@ func (m Manager) Config(name string) ([]byte, error) {
 }
 
 func (m Manager) Add(requestedName string) (Peer, error) {
+	return m.AddWithLastOctet(requestedName, 0)
+}
+
+// AddWithLastOctet uses automatic allocation when lastOctet is zero.
+func (m Manager) AddWithLastOctet(requestedName string, lastOctet int) (Peer, error) {
+	if lastOctet < 0 || lastOctet > 254 {
+		return Peer{}, errors.New("VPN IP Local must be a whole number from 1 to 254")
+	}
 	if err := m.prepare(); err != nil {
 		return Peer{}, err
 	}
@@ -211,11 +219,16 @@ func (m Manager) Add(requestedName string) (Peer, error) {
 	if err != nil || serverIP.To4() == nil {
 		return Peer{}, fmt.Errorf("WireGuard server Address must contain one IPv4 CIDR, got %q", serverAddress)
 	}
-	used, err := usedAddresses(serverConfig, peers)
+	used, err := usedAddresses(serverConfig, peers, network)
 	if err != nil {
 		return Peer{}, err
 	}
-	clientIP, err := nextAddress(network, serverIP, used)
+	var clientIP net.IP
+	if lastOctet == 0 {
+		clientIP, err = nextAddress(network, serverIP, used)
+	} else {
+		clientIP, err = addressWithLastOctet(network, serverIP, used, lastOctet)
+	}
 	if err != nil {
 		return Peer{}, err
 	}
@@ -734,7 +747,18 @@ func firstCSVValue(value string) string {
 	return strings.TrimSpace(value)
 }
 
-func usedAddresses(serverConfig []byte, peers []Peer) (map[uint32]struct{}, error) {
+func usedAddresses(serverConfig []byte, peers []Peer, network *net.IPNet) (map[uint32]struct{}, error) {
+	ones, bits := network.Mask.Size()
+	if bits != 32 || ones < 16 || ones > 30 {
+		return nil, errors.New("peer allocation requires an IPv4 subnet between /16 and /30")
+	}
+	start := ipToUint32(network.IP)
+	end := start | ^maskToUint32(network.Mask)
+	type addressRange struct {
+		first uint32
+		last  uint32
+	}
+	var ranges []addressRange
 	used := make(map[uint32]struct{})
 	for _, peer := range peers {
 		ip, _, err := net.ParseCIDR(peer.Address)
@@ -750,21 +774,94 @@ func usedAddresses(serverConfig []byte, peers []Peer) (map[uint32]struct{}, erro
 			section = strings.TrimSpace(line[1 : len(line)-1])
 			continue
 		}
-		if section != "Peer" {
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
 			continue
 		}
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 || !strings.EqualFold(strings.TrimSpace(parts[0]), "AllowedIPs") {
+		key := strings.TrimSpace(parts[0])
+		if section == "Interface" && strings.EqualFold(key, "Address") {
+			for _, value := range strings.Split(parts[1], ",") {
+				ip, _, err := net.ParseCIDR(strings.TrimSpace(value))
+				if err == nil && ip.To4() != nil {
+					used[ipToUint32(ip)] = struct{}{}
+				}
+			}
+		}
+		if section != "Peer" || !strings.EqualFold(key, "AllowedIPs") {
 			continue
 		}
 		for _, value := range strings.Split(parts[1], ",") {
-			ip, _, err := net.ParseCIDR(strings.TrimSpace(value))
+			ip, allowed, err := net.ParseCIDR(strings.TrimSpace(value))
 			if err == nil && ip.To4() != nil {
-				used[ipToUint32(ip)] = struct{}{}
+				first := ipToUint32(allowed.IP)
+				last := first | ^maskToUint32(allowed.Mask)
+				if last < start || first > end {
+					continue
+				}
+				ranges = append(ranges, addressRange{first: max(first, start), last: min(last, end)})
+			}
+		}
+	}
+	// Limit reservation to the allocation subnet and visit overlapping ranges once.
+	sort.Slice(ranges, func(i, j int) bool { return ranges[i].first < ranges[j].first })
+	for index := 0; index < len(ranges); {
+		reserved := ranges[index]
+		index++
+		for index < len(ranges) && ranges[index].first <= reserved.last {
+			reserved.last = max(reserved.last, ranges[index].last)
+			index++
+		}
+		for value := reserved.first; ; value++ {
+			used[value] = struct{}{}
+			if value == reserved.last {
+				break
 			}
 		}
 	}
 	return used, nil
+}
+
+// ParseLastOctet treats an empty value as automatic allocation.
+func ParseLastOctet(value string) (int, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0, nil
+	}
+	for _, digit := range value {
+		if digit < '0' || digit > '9' {
+			return 0, errors.New("VPN IP Local must be a whole number from 1 to 254")
+		}
+	}
+	lastOctet, err := strconv.Atoi(value)
+	if err != nil || lastOctet < 1 || lastOctet > 254 {
+		return 0, errors.New("VPN IP Local must be a whole number from 1 to 254")
+	}
+	return lastOctet, nil
+}
+
+func addressWithLastOctet(network *net.IPNet, serverIP net.IP, used map[uint32]struct{}, lastOctet int) (net.IP, error) {
+	ones, bits := network.Mask.Size()
+	if bits != 32 || ones < 16 || ones > 30 {
+		return nil, errors.New("peer allocation requires an IPv4 subnet between /16 and /30")
+	}
+	server := serverIP.To4()
+	address := net.IPv4(server[0], server[1], server[2], byte(lastOctet))
+	if !network.Contains(address) {
+		return nil, fmt.Errorf("VPN address %s is outside the WireGuard subnet %s", address, network)
+	}
+	value := ipToUint32(address)
+	start := ipToUint32(network.IP)
+	end := start | ^maskToUint32(network.Mask)
+	if value == start || value == end {
+		return nil, fmt.Errorf("VPN address %s is reserved as the subnet network or broadcast address", address)
+	}
+	if address.Equal(serverIP) {
+		return nil, fmt.Errorf("VPN address %s is reserved for the WireGuard server", address)
+	}
+	if _, exists := used[value]; exists {
+		return nil, fmt.Errorf("VPN address %s is already in use; choose another VPN IP Local", address)
+	}
+	return address, nil
 }
 
 func nextAddress(network *net.IPNet, serverIP net.IP, used map[uint32]struct{}) (net.IP, error) {

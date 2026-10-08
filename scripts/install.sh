@@ -173,8 +173,8 @@ cidrs_overlap() {
 }
 
 network_conflicts_with_routes() {
-  local route_type destination remainder
-  while read -r route_type destination remainder; do
+  local route_type destination _route_remainder
+  while read -r route_type destination _route_remainder; do
     case "$route_type" in
       default) continue ;;
       local|broadcast|unreachable|prohibit|blackhole|throw) ;;

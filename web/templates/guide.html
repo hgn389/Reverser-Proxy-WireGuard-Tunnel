@@ -180,6 +180,7 @@ sudo rpctl ssl status shop.example.com</code></pre>
       <p>On VPS-1, use Dashboard → <strong>WireGuard peers - Add a device</strong> → <strong>Create peer</strong>, terminal menu item 13, or this command:</p>
       <pre><code>sudo rpctl wg peer add
 sudo rpctl wg peer list</code></pre>
+      <p>To choose the VPN address when creating a peer, enter its last number in <strong>VPN IP Local (optional)</strong> after <strong>Peer name (optional)</strong>, or use a command such as <code>sudo rpctl wg peer add home-server --ip-last-octet 25</code>. On the default subnet, this selects <code>10.10.10.25/32</code>. Leave the field empty for automatic allocation. Enter a whole number from 1 to 254; the address must be inside the configured subnet and cannot be a server, reserved, or occupied address.</p>
       <p>The first additional peer is normally <code>client2</code> with <code>10.10.10.3/32</code>. Download it from Dashboard or copy this file:</p>
       <pre><code>/etc/rpctl/wireguard/peers/client2.conf</code></pre>
 
