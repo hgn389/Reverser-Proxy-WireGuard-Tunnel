@@ -21,6 +21,7 @@
   </header>
   <main class="guide">
     {{template "update-banner" .}}
+    <p class="form-hint">Click a command to copy it, or focus it and press Enter. Independent commands are listed separately; configuration snippets copy as a whole.</p>
     {{if eq .VPNMode "tailscale"}}
     <section>
       <h1>Tailscale Configuration Guide</h1>

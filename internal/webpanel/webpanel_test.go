@@ -576,6 +576,18 @@ func TestVietnameseTemplatesAndUpdateStyles(t *testing.T) {
 			t.Errorf("update and language CSS missing %q", expected)
 		}
 	}
+	guideScript, err := fs.ReadFile(webassets.Files, "static/guide.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"enableCopy(row, entry.command", "enableCopy(pre, source", "element.tabIndex = 0", "event.key === 'Enter'", "event.key === ' '"} {
+		if !strings.Contains(string(guideScript), expected) {
+			t.Errorf("direct guide copying missing %q", expected)
+		}
+	}
+	if strings.Contains(string(guideScript), "copyButton(") {
+		t.Error("guide should copy directly without separate copy buttons")
+	}
 }
 
 func TestInvalidHostIsRejected(t *testing.T) {

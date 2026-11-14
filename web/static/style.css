@@ -66,15 +66,14 @@ button:disabled:hover { filter: none; }
 .update-check { background: #bd561d; color: #fff; }
 .language-switch { display: inline-flex; align-items: center; gap: .4rem; background: #30363d; }
 .language-switch svg { flex: 0 0 24px; }
-.guide-commands { display: grid; gap: .65rem; margin: 1em 0; }
-.guide-command { display: flex; align-items: flex-start; gap: .75rem; margin: 0; }
+.guide-commands { display: grid; gap: .15rem; margin: .4rem 0; }
+.guide-command { display: flex; align-items: flex-start; margin: 0; }
 .guide-command code { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .guide-command-comment { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; opacity: .8; }
-.guide-copy { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; min-width: 36px; min-height: 36px; padding: .4rem; background: #30363d; }
-.guide-copy:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
-.guide-snippet { position: relative; }
-.guide-snippet > .guide-copy { position: absolute; right: .5rem; top: .5rem; }
-.guide-snippet > pre { padding-right: 3.5rem; }
+.guide-copy-target { cursor: copy; }
+.guide-copy-target:hover { color: #79c0ff; }
+.guide-copy-target:focus-visible { outline: 2px solid #79c0ff; outline-offset: 2px; }
+.guide-copy-target.copied { color: #7ee787; }
 .guide-copy-status { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .secondary { background: #30363d; }
 .danger { background: #da3633; }
@@ -184,8 +183,11 @@ td:first-child { font-weight: 650; }
 code { white-space: nowrap; }
 pre { overflow-x: auto; padding: 1rem; border: 1px solid #30363d; border-radius: 8px; background: #0d1117; line-height: 1.55; }
 .guide { max-width: 1200px; }
-.guide li { margin: .45rem 0; line-height: 1.55; }
-.guide p { line-height: 1.6; }
+.guide section { padding: .85rem 1rem; margin-bottom: .65rem; }
+.guide pre { padding: .2rem 0; margin: .35rem 0; border: 0; border-radius: 0; background: transparent; line-height: 1.4; }
+.guide .guide-command { margin: 0; }
+.guide li { margin: .2rem 0; line-height: 1.4; }
+.guide p { margin: .45rem 0; line-height: 1.45; }
 .guide-note { margin-top: 1rem; padding: .85rem 1rem; border-left: 4px solid #d29922; border-radius: 6px; background: #0d1117; line-height: 1.55; }
 .example-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: .75rem; }
 .example-grid div { display: grid; gap: .4rem; padding: 1rem; border-radius: 8px; background: #0d1117; }

@@ -73,26 +73,14 @@
     }
   }
 
-  function copyButton(text, label) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'guide-copy';
-    button.setAttribute('aria-label', label);
-    button.title = label;
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '0 0 24 24');
-    svg.setAttribute('width', '18');
-    svg.setAttribute('height', '18');
-    svg.setAttribute('fill', 'none');
-    svg.setAttribute('stroke', 'currentColor');
-    svg.setAttribute('stroke-width', '1.8');
-    svg.setAttribute('aria-hidden', 'true');
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', 'M9 5H5v14h10v-4M9 3h10v12H9z');
-    svg.append(path);
-    button.append(svg);
+  function enableCopy(element, text, label) {
+    element.classList.add('guide-copy-target');
+    element.setAttribute('role', 'button');
+    element.tabIndex = 0;
+    element.setAttribute('aria-label', label);
+    element.title = label;
     let timer;
-    button.addEventListener('click', async () => {
+    const copy = async () => {
       clearTimeout(timer);
       try {
         try {
@@ -102,18 +90,26 @@
           fallbackCopy(text);
         }
         status.textContent = labels.copied;
-        button.setAttribute('aria-label', labels.copied);
-        button.title = labels.copied;
+        element.classList.add('copied');
+        element.setAttribute('aria-label', labels.copied);
+        element.title = labels.copied;
       } catch {
         status.textContent = labels.failed;
-        button.title = labels.failed;
+        element.title = labels.failed;
       }
       timer = setTimeout(() => {
-        button.setAttribute('aria-label', label);
-        button.title = label;
+        element.classList.remove('copied');
+        element.setAttribute('aria-label', label);
+        element.title = label;
       }, 2000);
+    };
+    element.addEventListener('click', copy);
+    element.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        void copy();
+      }
     });
-    return button;
   }
 
   let status;
@@ -146,7 +142,8 @@
             row.dataset.guideCopyReady = 'true';
             const command = document.createElement('code');
             command.textContent = entry.command;
-            row.append(command, copyButton(entry.command, labels.command));
+            row.append(command);
+            enableCopy(row, entry.command, labels.command);
             container.append(row);
           }
         });
@@ -154,7 +151,8 @@
       } else {
         container.className = 'guide-snippet';
         pre.replaceWith(container);
-        container.append(pre, copyButton(source, labels.snippet));
+        container.append(pre);
+        enableCopy(pre, source, labels.snippet);
       }
     });
   }
