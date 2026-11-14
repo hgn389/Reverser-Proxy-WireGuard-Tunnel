@@ -74,7 +74,10 @@ button:disabled:hover { filter: none; }
 .guide-copy-target:hover { color: #79c0ff; }
 .guide-copy-target:focus-visible { outline: 2px solid #79c0ff; outline-offset: 2px; }
 .guide-copy-target.copied { color: #7ee787; }
-.guide-copy-status { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.guide-copy-marker { display: none; width: 20px; height: 20px; flex: 0 0 20px; color: #3fb950; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.copied > .guide-copy-marker { display: block; }
+.guide-copy-status { position: fixed; bottom: 1rem; right: 1rem; z-index: 20; padding: .5rem .8rem; border: 1px solid #3fb950; border-radius: 6px; background: #111418; color: #7ee787; box-shadow: 0 4px 16px #0006; max-width: calc(100vw - 2rem); }
+.guide-copy-status[hidden] { display: none; }
 .secondary { background: #30363d; }
 .danger { background: #da3633; }
 .button-link { display: inline-flex; align-items: center; justify-content: center; padding: .65rem .9rem; border-radius: 6px; color: #fff; font-weight: 700; text-decoration: none; white-space: nowrap; }
@@ -186,6 +189,13 @@ pre { overflow-x: auto; padding: 1rem; border: 1px solid #30363d; border-radius:
 .guide section { padding: .85rem 1rem; margin-bottom: .65rem; }
 .guide pre { padding: .2rem 0; margin: .35rem 0; border: 0; border-radius: 0; background: transparent; line-height: 1.4; }
 .guide .guide-command { margin: 0; }
+.guide .guide-copy-target { display: flex; align-items: flex-start; gap: .5rem; padding: .3rem .5rem; background: #111418; }
+.guide-copy-target > code { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.guide-snippet { position: relative; }
+.guide .guide-snippet > pre { padding: .65rem 3.5rem .65rem .75rem; border: 1px solid #30363d; border-radius: 6px; background: #111418; white-space: pre; }
+.guide .guide-snippet-copy { position: absolute; top: .4rem; right: .4rem; padding: .3rem; border-radius: 4px; background: #30363d; }
+.guide-snippet-copy > svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.guide-snippet-copy.copied > svg:first-child { display: none; }
 .guide li { margin: .2rem 0; line-height: 1.4; }
 .guide p { margin: .45rem 0; line-height: 1.45; }
 .guide-note { margin-top: 1rem; padding: .85rem 1rem; border-left: 4px solid #d29922; border-radius: 6px; background: #0d1117; line-height: 1.55; }

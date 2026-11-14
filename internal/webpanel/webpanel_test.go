@@ -580,13 +580,24 @@ func TestVietnameseTemplatesAndUpdateStyles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"enableCopy(row, entry.command", "enableCopy(pre, source", "element.tabIndex = 0", "event.key === 'Enter'", "event.key === ' '"} {
+	for _, expected := range []string{"enableCopy(row, entry.command", "enableCopy(button, source", "guide-snippet-copy", "element.tabIndex = 0", "event.key === 'Enter'", "event.key === ' '"} {
 		if !strings.Contains(string(guideScript), expected) {
 			t.Errorf("direct guide copying missing %q", expected)
 		}
 	}
 	if strings.Contains(string(guideScript), "copyButton(") {
 		t.Error("guide should copy directly without separate copy buttons")
+	}
+	for _, expected := range []string{"guide-copy-marker", "marker.append(circle, tick)", "element.classList.add('copied')"} {
+		if !strings.Contains(string(guideScript), expected) {
+			t.Errorf("persistent copy feedback missing %q", expected)
+		}
+	}
+	if strings.Contains(string(guideScript), "classList.remove('copied')") {
+		t.Error("copied command markers must remain until navigation or reload")
+	}
+	if !strings.Contains(string(css), "background: #111418") || !strings.Contains(string(css), ".copied > .guide-copy-marker") {
+		t.Error("command background and persistent checkmark styles missing")
 	}
 }
 

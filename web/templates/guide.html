@@ -21,7 +21,7 @@
   </header>
   <main class="guide">
     {{template "update-banner" .}}
-    <p class="form-hint">Click a command to copy it, or focus it and press Enter. Independent commands are listed separately; configuration snippets copy as a whole.</p>
+    <p class="form-hint">Click a command to copy it, or focus it and press Enter. A green circled checkmark marks copied commands until you reload or leave this page. Independent commands are listed separately; multiline configuration blocks keep their formatting and have a copy icon.</p>
     {{if eq .VPNMode "tailscale"}}
     <section>
       <h1>Tailscale Configuration Guide</h1>

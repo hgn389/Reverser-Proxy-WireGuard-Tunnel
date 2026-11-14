@@ -79,9 +79,19 @@
     element.tabIndex = 0;
     element.setAttribute('aria-label', label);
     element.title = label;
-    let timer;
+    const marker = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    marker.setAttribute('class', 'guide-copy-marker');
+    marker.setAttribute('viewBox', '0 0 24 24');
+    marker.setAttribute('aria-hidden', 'true');
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('cx', '12');
+    circle.setAttribute('cy', '12');
+    circle.setAttribute('r', '9');
+    const tick = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    tick.setAttribute('d', 'm8 12 3 3 5-6');
+    marker.append(circle, tick);
+    element.append(marker);
     const copy = async () => {
-      clearTimeout(timer);
       try {
         try {
           if (!navigator.clipboard || !navigator.clipboard.writeText) throw new Error('Clipboard unavailable');
@@ -89,19 +99,19 @@
         } catch {
           fallbackCopy(text);
         }
+        status.textContent = '';
+        status.hidden = false;
         status.textContent = labels.copied;
         element.classList.add('copied');
         element.setAttribute('aria-label', labels.copied);
         element.title = labels.copied;
       } catch {
+        status.hidden = false;
         status.textContent = labels.failed;
         element.title = labels.failed;
       }
-      timer = setTimeout(() => {
-        element.classList.remove('copied');
-        element.setAttribute('aria-label', label);
-        element.title = label;
-      }, 2000);
+      clearTimeout(statusTimer);
+      statusTimer = setTimeout(() => { status.hidden = true; }, 2500);
     };
     element.addEventListener('click', copy);
     element.addEventListener('keydown', event => {
@@ -113,11 +123,13 @@
   }
 
   let status;
+  let statusTimer;
   function initialize() {
     const blocks = document.querySelectorAll('pre > code');
     if (!blocks.length) return;
     status = document.createElement('span');
     status.className = 'guide-copy-status';
+    status.hidden = true;
     status.setAttribute('role', 'status');
     status.setAttribute('aria-live', 'polite');
     document.body.append(status);
@@ -151,8 +163,18 @@
       } else {
         container.className = 'guide-snippet';
         pre.replaceWith(container);
-        container.append(pre);
-        enableCopy(pre, source, labels.snippet);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'guide-snippet-copy';
+        const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        icon.setAttribute('viewBox', '0 0 24 24');
+        icon.setAttribute('aria-hidden', 'true');
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', 'M9 5H5v14h10v-4M9 3h10v12H9z');
+        icon.append(path);
+        button.append(icon);
+        enableCopy(button, source, labels.snippet);
+        container.append(pre, button);
       }
     });
   }
