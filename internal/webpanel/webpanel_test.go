@@ -449,6 +449,12 @@ func TestLoginSessionAndCSRF(t *testing.T) {
 		t.Fatalf("guide is missing English content: %s", guide.Body.String())
 	}
 
+	for _, expected := range []string{"ERR_TOO_MANY_REDIRECTS", "Full (Strict)", "--resolve", "$realip_remote_addr:$http_x_forwarded_proto", "$_SERVER['REMOTE_ADDR']", "Real-IP caveat", "after every restore"} {
+		if !strings.Contains(guide.Body.String(), expected) {
+			t.Errorf("guide is missing redirect troubleshooting content %q", expected)
+		}
+	}
+
 	badAction := httptest.NewRecorder()
 	request = formRequest("https://panel.example.com/system/nginx-restart", url.Values{"csrf": {"wrong"}}, sessionCookieValue)
 	handler.ServeHTTP(badAction, request)

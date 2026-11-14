@@ -251,6 +251,64 @@ sudo rpctl wg peer list
 sudo wg show</code></pre>
     </section>
     {{end}}
+
+    <section id="redirect-loops">
+      <h2>Too Many Redirects (ERR_TOO_MANY_REDIRECTS)</h2>
+      <p>If HTTPS repeatedly redirects to the same URL, check each connection separately. Deleting browser cookies does not fix a server-side redirect loop. Two independent loops can exist at the same time.</p>
+      <pre>Visitor → HTTPS → Cloudflare (optional)
+        → HTTPS :443 → VPS-1 reverse proxy
+        → HTTP over the private VPN → VPS-2 website</pre>
+
+      <h3>1. Check Cloudflare to VPS-1</h3>
+      <p>Issue a valid certificate on VPS-1 first, then select <strong>SSL/TLS → Overview → Full (Strict)</strong> in Cloudflare. Do not use <strong>Flexible</strong>: it sends HTTP to VPS-1, which may redirect back to the same public HTTPS URL. If Full (Strict) is already selected, check Configuration Rules and Origin Rules for SSL or origin-port overrides.</p>
+      <p>Replace the example domain and <code>VPS1_PUBLIC_IP</code>. Run these from a computer that can reach VPS-1. <code>--resolve</code> bypasses Cloudflare while preserving the hostname and TLS certificate verification; do not add <code>-k</code>.</p>
+      <pre><code># Public route, including Cloudflare if enabled
+curl -I -L --max-redirs 5 https://shop.example.com/
+
+# HTTPS directly to VPS-1, bypassing Cloudflare
+curl -I --resolve shop.example.com:443:VPS1_PUBLIC_IP https://shop.example.com/</code></pre>
+      <p>If direct HTTPS succeeds but the public route loops, investigate Cloudflare SSL settings, rules, and the configured DNS origin. This comparison alone does not prove that Flexible is enabled.</p>
+
+      <h3>2. Check VPS-1 to the Website Backend</h3>
+      <p>Run on VPS-1, replacing the backend address with the real WireGuard or Tailscale address:</p>
+      <pre><code>curl -I -H 'Host: shop.example.com' \
+  -H 'X-Forwarded-Proto: https' http://10.10.10.2:80/</code></pre>
+      <p>rpctl already sends <code>Host</code> and <code>X-Forwarded-Proto</code>. However, an unconditional backend rule such as <code>if ($scheme = http)</code> still redirects: the backend connection really is HTTP even when the visitor used HTTPS. A repeated redirect to <code>https://shop.example.com/</code> must be investigated, not treated as a successful upstream test. WordPress or another application may also redirect if it does not recognize the original HTTPS connection.</p>
+
+      <h3>3. Fix aaPanel Nginx and WordPress on VPS-2</h3>
+      <div class="guide-note"><strong>Back up the website configuration before editing.</strong> These are manual backend changes, not settings that rpctl applies remotely. Replace <code>10.10.10.1</code> with the actual private source IP of VPS-1, and replace the example domain. For Tailscale, use VPS-1's Tailscale IP. Never trust forwarded headers from every client or an entire subnet unnecessarily.</div>
+      <p>In <strong>aaPanel → Website → your domain → Configuration</strong>, replace the existing unconditional HTTP-to-HTTPS rule with the following inside that website's <code>server</code> block. Keep unrelated rules intact. This requires Nginx's HTTP real-IP module.</p>
+      <pre><code># Trust HTTPS forwarding only from the private reverse proxy.
+set $rpctl_original_scheme $scheme;
+set $rpctl_proxy_source "$realip_remote_addr:$http_x_forwarded_proto";
+if ($rpctl_proxy_source = "10.10.10.1:https") {
+    set $rpctl_original_scheme https;
+}
+if ($rpctl_original_scheme = http) {
+    return 301 https://shop.example.com$request_uri;
+}</code></pre>
+      <p>Remove any duplicate Force HTTPS rule that still checks only <code>$scheme</code>. Do not re-enable aaPanel's Force HTTPS switch if it recreates that rule. Keep HTTP-to-HTTPS redirection enabled on the public VPS-1 proxy.</p>
+      <p>For WordPress, add the following to that site's <code>wp-config.php</code> before it loads <code>wp-settings.php</code>. Keep the WordPress site URLs on HTTPS.</p>
+      <pre><code>// Only the trusted private proxy may report the original HTTPS scheme.
+if (
+    ($_SERVER['REMOTE_ADDR'] ?? '') === '10.10.10.1'
+    &amp;&amp; ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https'
+) {
+    $_SERVER['HTTPS'] = 'on';
+    $_SERVER['SERVER_PORT'] = '443';
+    $_SERVER['REQUEST_SCHEME'] = 'https';
+}</code></pre>
+      <p><strong>Real-IP caveat:</strong> this PHP example assumes <code>REMOTE_ADDR</code> still contains VPS-1's private IP. If Nginx replaces it with the visitor IP, instead pass a server-controlled FastCGI parameter based on the trusted original connection address and use that parameter in the application. Do not remove the source-IP check and blindly trust <code>HTTP_X_FORWARDED_PROTO</code>.</p>
+      <p>On a standard aaPanel installation, test Nginx before reloading. If the test fails, restore or correct the configuration and do not reload:</p>
+      <pre><code>sudo /www/server/nginx/sbin/nginx -t
+# Run only after the configuration test succeeds:
+sudo /www/server/nginx/sbin/nginx -s reload</code></pre>
+
+      <h3>4. Verify and Prevent Recurrence</h3>
+      <p>Repeat both the upstream test from VPS-1 and the public HTTPS test. The homepage should normally finish at <code>200 OK</code>, not repeatedly redirect to itself. Also confirm that direct backend HTTP requests from untrusted sources cannot bypass HTTPS by spoofing the forwarded header. If curl succeeds but the browser still loops, try a private window to exclude a cached redirect.</p>
+      <p>Apply the backend pattern to each new website, or maintain a reviewed aaPanel virtual-host template and an application-specific HTTPS integration. Restoring an old virtual-host configuration or <code>wp-config.php</code> can restore the bug, so check these settings after every restore. Restrict backend access to the intended proxy where possible.</p>
+      <p><strong>HTTPS upstream alternative:</strong> changing to <code>https://BACKEND:443</code> requires a reachable TLS listener and a valid certificate matching the upstream hostname. rpctl verifies upstream certificates and uses the upstream hostname for TLS SNI; a certificate for the public domain normally will not match a private IP. Do not disable certificate verification to hide this mismatch or point the upstream back at the public proxy.</p>
+    </section>
   </main>
   <footer><strong>rpctl v{{.Version}}</strong><span aria-hidden="true">&copy;</span><span>by <a href="https://hoanggiangnam.com" target="_blank" rel="noopener noreferrer">Nam Hoàng</a></span></footer>
 </body>
