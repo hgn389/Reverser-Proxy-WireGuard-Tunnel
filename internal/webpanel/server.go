@@ -169,6 +169,7 @@ func (s *Server) Handler() (http.Handler, error) {
 	mux.HandleFunc("POST /login", s.login)
 	mux.Handle("GET /", s.auth(http.HandlerFunc(s.dashboard)))
 	mux.Handle("GET /guide", s.auth(http.HandlerFunc(s.guide)))
+	mux.Handle("GET /update", s.auth(http.HandlerFunc(s.updatePage)))
 	mux.Handle("POST /logout", s.auth(s.csrf(http.HandlerFunc(s.logout))))
 	mux.Handle("POST /proxy/add", s.auth(s.csrf(http.HandlerFunc(s.proxyAdd))))
 	mux.Handle("POST /proxy/edit", s.auth(s.csrf(http.HandlerFunc(s.proxyEdit))))
@@ -430,6 +431,11 @@ func (s *Server) guide(w http.ResponseWriter, r *http.Request) {
 		CSRF:    current.CSRF,
 		VPNMode: string(vpnmode.Detect()),
 	})
+}
+
+func (s *Server) updatePage(w http.ResponseWriter, r *http.Request) {
+	current, _ := s.currentSession(r)
+	s.render(w, "update.html", guideData{Version: s.version, CSRF: current.CSRF})
 }
 
 func (s *Server) tailscaleStatus() (tailscale.Status, string) {

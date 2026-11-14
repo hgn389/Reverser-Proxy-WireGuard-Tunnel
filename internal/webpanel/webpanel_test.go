@@ -455,6 +455,37 @@ func TestLoginSessionAndCSRF(t *testing.T) {
 		}
 	}
 
+	updatePage := httptest.NewRecorder()
+	request = httptest.NewRequest(http.MethodGet, "https://panel.example.com/update", nil)
+	handler.ServeHTTP(updatePage, request)
+	if updatePage.Code != http.StatusSeeOther {
+		t.Fatalf("unauthenticated update page status=%d", updatePage.Code)
+	}
+	updatePage = httptest.NewRecorder()
+	request.AddCookie(sessionCookieValue)
+	handler.ServeHTTP(updatePage, request)
+	if updatePage.Code != http.StatusOK {
+		t.Fatalf("update page status=%d", updatePage.Code)
+	}
+	for _, expected := range []string{"Software Update", "update-latest", "update-checked", "update-install", `action="/system/update"`, "update-icon", "Updates are never installed automatically"} {
+		if !strings.Contains(updatePage.Body.String(), expected) {
+			t.Errorf("update page missing %q", expected)
+		}
+	}
+	for _, page := range []string{dashboard.Body.String(), guide.Body.String(), updatePage.Body.String()} {
+		updateLink := strings.Index(page, `href="/update"`)
+		githubLink := strings.Index(page, `href="https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel"`)
+		if updateLink < 0 || githubLink < updateLink || !strings.Contains(page, "update-icon") {
+			t.Error("header must link Update before GitHub and include the notification icon")
+		}
+	}
+	updateDenied := httptest.NewRecorder()
+	request = formRequest("https://panel.example.com/system/update", url.Values{"csrf": {"wrong"}}, sessionCookieValue)
+	handler.ServeHTTP(updateDenied, request)
+	if updateDenied.Code != http.StatusForbidden {
+		t.Fatalf("update without valid CSRF status=%d", updateDenied.Code)
+	}
+
 	badAction := httptest.NewRecorder()
 	request = formRequest("https://panel.example.com/system/nginx-restart", url.Values{"csrf": {"wrong"}}, sessionCookieValue)
 	handler.ServeHTTP(badAction, request)
@@ -538,6 +569,9 @@ func TestDashboardSSLControlsAndResponsiveAssets(t *testing.T) {
 	html := rendered.String()
 	for _, expected := range []string{"/ssl/issue", "/ssl/renew", "Issue certificate", "Renew certificate", "45 days", "Expires 2026-11-16", "12 days", "class=\"proxy-table\"", "class=\"ssl-content\"", "class=\"actions-content\"", "Reverse Proxy &amp; VPN Tunnel", "Configuration Guide", "https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel", "rpctl vtest", "Nam Hoàng", "203.0.113.1", "10.77.0.1", "1 vCPU", "128 / 512 MB used", "1.0 GB", "5.0 / 20.0 GB used", "Webpanel Dashboard", "http://203.0.113.1:9080", "/system/nginx-restart", "/system/update", "/system/reboot", "/wireguard/peer/add", "/wireguard/peer/download", "/wireguard/peer/delete", "WireGuard peers - Add a device", "the name of the newly added device", "the private VPN IP address that VPS-1 assigns", "Setup guide", "Use the QR code to connect a mobile device quickly", "shop.example.com", "10.10.10.25:80", "10.10.10.212:3000", "the public hostname that visitors use", "The website or application must already be running", "use the <strong>Reverse proxies</strong> section", "data-qr-peer=\"client2\"", "View QR", "wireguard-qr-dialog", "/static/app.js", "client2", "10.77.0.3/32", "/static/favicon.svg"} {
 		if !strings.Contains(html, expected) {
+			if expected == "/system/update" && strings.Contains(html, `href="/update"`) {
+				continue // Installation now lives on the dedicated Update page.
+			}
 			t.Errorf("dashboard is missing %q", expected)
 		}
 	}

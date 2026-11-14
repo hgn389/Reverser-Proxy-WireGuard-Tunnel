@@ -1,0 +1,50 @@
+{{define "update-banner"}}
+<div class="update-banner" id="update-banner" data-session="{{.CSRF}}" role="status" hidden>
+  <svg class="update-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg>
+  <span>A new version <strong id="update-version"></strong> is available.</span>
+  <a class="update-now" href="/update">Update now!</a>
+  <button type="button" class="update-dismiss" id="update-dismiss" aria-label="Dismiss update notification">&times;</button>
+</div>
+{{end}}
+{{define "update.html"}}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>rpctl Update</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header>
+    <div class="brand"><strong>Reverse Proxy &amp; VPN Tunnel</strong></div>
+    <nav><a href="/">Dashboard</a><a href="/guide">Configuration Guide</a></nav>
+    <div class="header-actions"><a class="github-link active" href="/update" aria-current="page">Update</a><a class="github-link" href="https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel" target="_blank" rel="noopener noreferrer">GitHub</a><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="secondary">Sign out</button></form></div>
+  </header>
+  <main>
+    {{template "update-banner" .}}
+    <section>
+      <h1>Software Update</h1>
+      <p>Check the latest GitHub release and install a checksum-verified update. Installation starts only when you select Install update.</p>
+      <dl class="update-details">
+        <dt>Installed version</dt><dd>v{{.Version}}</dd>
+        <dt>Latest version</dt><dd id="update-latest">Not checked</dd>
+        <dt>Last checked</dt><dd id="update-checked">Not checked</dd>
+      </dl>
+      <p id="version-check-status" role="status" aria-live="polite">Checking for updates...</p>
+      <button type="button" class="secondary" id="version-check" data-version="v{{.Version}}" title="Check for updates">Check for updates</button>
+      <form method="post" action="/system/update" id="update-install-form">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <p>The binary and SHA256SUMS are downloaded from the official GitHub release. The panel may restart and briefly disconnect. Website and VPN settings are preserved. The result returns to Dashboard.</p>
+        <button type="submit" id="update-install" disabled>Install update</button>
+      </form>
+      <p>Automatic checks run at startup and every hour. A notification with an icon appears when a newer version is available. Updates are never installed automatically.</p>
+      <p><a href="https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel/releases" target="_blank" rel="noopener noreferrer">View release notes on GitHub</a></p>
+    </section>
+  </main>
+  <footer><strong>rpctl v{{.Version}}</strong><span aria-hidden="true">&copy;</span><span>by <a href="https://hoanggiangnam.com" target="_blank" rel="noopener noreferrer">Nam Hoang</a></span></footer>
+</body>
+</html>
+{{end}}

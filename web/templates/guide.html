@@ -7,6 +7,7 @@
   <title>rpctl Configuration Guide</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
 </head>
 <body>
   <header>
@@ -15,9 +16,10 @@
       <a href="/">Dashboard</a>
       <a class="active" href="/guide">Configuration Guide</a>
     </nav>
-    <div class="header-actions"><a class="github-link" href="https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel" target="_blank" rel="noopener noreferrer">GitHub</a><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="secondary">Sign out</button></form></div>
+    <div class="header-actions"><a class="github-link" href="/update">Update</a><a class="github-link" href="https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel" target="_blank" rel="noopener noreferrer">GitHub</a><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="secondary">Sign out</button></form></div>
   </header>
   <main class="guide">
+    {{template "update-banner" .}}
     {{if eq .VPNMode "tailscale"}}
     <section>
       <h1>Tailscale Configuration Guide</h1>

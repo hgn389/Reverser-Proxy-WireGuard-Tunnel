@@ -2,9 +2,13 @@
 
 ## Quick Install
 
+### Web Panel Updates in v1.0.13
+
+The **Update** link before **GitHub** in the authenticated header opens a dedicated update page with the installed version, latest release, last check time, and manual check and installation controls. The panel checks for releases at startup and every hour. When a newer release is available, Dashboard, Configuration Guide, and Update show a dismissible notification box with an icon on the left. Installation requires administrator confirmation and uses the existing checksum-verified updater; updates are not installed automatically. The panel may restart briefly after installation.
+
 ### 1. VPS-1 — Reverse Proxy
 
-This v1.0.12 installer supports **Ubuntu Server 22.04 LTS and 24.04 LTS** on `amd64` and `arm64`. Run this command on a clean VPS:
+This v1.0.13 installer supports **Ubuntu Server 22.04 LTS and 24.04 LTS** on `amd64` and `arm64`. Run this command on a clean VPS:
 
 ```bash
 sudo apt update && sudo apt install -y ca-certificates curl git && git clone https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel.git rpctl && cd rpctl && sudo bash scripts/install.sh

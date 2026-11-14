@@ -68,6 +68,10 @@ button:hover { filter: brightness(1.12); }
 
 .update-banner { display: flex; align-items: center; justify-content: center; gap: .7rem; position: sticky; top: .6rem; z-index: 5; padding: .8rem 1rem; margin-bottom: 1rem; border: 1px solid #3fb950; border-radius: 8px; background: #16351f; box-shadow: 0 8px 24px rgba(1, 4, 9, .45); }
 .update-banner[hidden] { display: none; }
+.update-icon { flex: 0 0 24px; color: #7ee787; }
+.update-banner { justify-content: flex-start; padding-right: 3rem; }
+.update-details { display: grid; grid-template-columns: auto 1fr; gap: .7rem 1rem; }
+.update-details dd { margin: 0; overflow-wrap: anywhere; }
 .update-banner form { margin: 0; }
 .update-now { padding: 0; background: transparent; color: #7ee787; text-decoration: underline; text-underline-offset: .18em; }
 .update-now:hover { color: #aff5b4; filter: none; }
@@ -220,6 +224,7 @@ footer a { text-decoration: none; }
 
 @media (max-width: 440px) {
   header { gap: .6rem; padding: .7rem; }
+  .header-actions { flex-wrap: wrap; justify-content: flex-end; max-width: 12rem; }
   nav { gap: .15rem; }
   nav a { padding: .5rem .6rem; }
   .section-heading { display: grid; }

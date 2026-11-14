@@ -101,13 +101,18 @@
     const dismiss = document.querySelector("#update-dismiss");
     const versionCheck = document.querySelector("#version-check");
     const versionCheckStatus = document.querySelector("#version-check-status");
-    if (!banner || !version || !dismiss || !versionCheck || !versionCheckStatus) {
+    const latest = document.querySelector("#update-latest");
+    const checked = document.querySelector("#update-checked");
+    const install = document.querySelector("#update-install");
+    const installForm = document.querySelector("#update-install-form");
+    if (!banner || !version || !dismiss) {
       return;
     }
 
     const storageKey = "rpctl-update-dismissed";
     const currentSession = banner.dataset.session || "session";
     const setCheckStatus = (message, state = "") => {
+      if (!versionCheckStatus) return;
       versionCheckStatus.textContent = message;
       if (state) {
         versionCheckStatus.dataset.state = state;
@@ -116,7 +121,9 @@
       }
     };
     const refresh = async ({ showAfterCheck = false, force = false, announce = false } = {}) => {
-      if (announce) {
+      if (installForm?.dataset.installing) return;
+      if (install) install.disabled = true;
+      if (announce && versionCheck) {
         versionCheck.disabled = true;
         versionCheck.setAttribute("aria-busy", "true");
         setCheckStatus("Checking for updates...");
@@ -132,15 +139,18 @@
           throw new Error(`HTTP ${response.status}`);
         }
         const update = await response.json();
+        if (latest) latest.textContent = update.latest || "Unknown";
+        if (checked) checked.textContent = update.checked_at ? new Date(update.checked_at).toLocaleString() : "Unknown";
+        if (install) install.disabled = !update.available || !update.latest;
         if (!update.available || !update.latest) {
           banner.hidden = true;
-          if (announce) {
-            setCheckStatus(`${versionCheck.dataset.version} is up to date.`, "current");
+          if (announce || latest) {
+            setCheckStatus(`${update.current || versionCheck?.dataset.version || "Installed version"} is up to date.`, "current");
           }
           return;
         }
         version.textContent = update.latest;
-        if (announce) {
+        if (announce || latest) {
           setCheckStatus(`New version ${update.latest} is available.`, "available");
         }
         let dismissed = null;
@@ -159,12 +169,14 @@
           banner.hidden = false;
         }
       } catch (_) {
-        if (announce) {
+        if (announce || latest) {
           setCheckStatus("Update check failed. Try again.", "error");
         }
+        if (latest) latest.textContent = "Unavailable";
+        if (checked) checked.textContent = "Check failed";
         // Keep the dashboard usable when GitHub or the network is unavailable.
       } finally {
-        if (announce) {
+        if (announce && versionCheck) {
           versionCheck.disabled = false;
           versionCheck.removeAttribute("aria-busy");
         }
@@ -180,8 +192,20 @@
       banner.hidden = true;
     });
 
-    versionCheck.addEventListener("click", () => {
+    if (versionCheck) versionCheck.addEventListener("click", () => {
       void refresh({ showAfterCheck: true, force: true, announce: true });
+    });
+
+    if (installForm) installForm.addEventListener("submit", (event) => {
+      if (!install || install.disabled || !window.confirm("Install the latest verified release? The panel may restart briefly.")) {
+        event.preventDefault();
+        return;
+      }
+      installForm.dataset.installing = "true";
+      install.disabled = true;
+      install.textContent = "Installing update...";
+      if (versionCheck) versionCheck.disabled = true;
+      setCheckStatus("Installing update. The panel may briefly disconnect; reconnect after it restarts.");
     });
 
     void refresh();

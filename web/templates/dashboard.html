@@ -13,14 +13,10 @@
   <header>
     <div class="brand"><strong>Reverse Proxy &amp; VPN Tunnel</strong></div>
     <nav><a class="active" href="/">Dashboard</a><a href="/guide">Configuration Guide</a></nav>
-    <div class="header-actions"><a class="github-link" href="https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel" target="_blank" rel="noopener noreferrer">GitHub</a><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="secondary">Sign out</button></form></div>
+    <div class="header-actions"><a class="github-link" href="/update">Update</a><a class="github-link" href="https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel" target="_blank" rel="noopener noreferrer">GitHub</a><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="secondary">Sign out</button></form></div>
   </header>
   <main>
-    <div class="update-banner" id="update-banner" data-session="{{.CSRF}}" hidden>
-      <span>A new version <strong id="update-version"></strong> is available.</span>
-      <form method="post" action="/system/update"><input type="hidden" name="csrf" value="{{.CSRF}}"><button type="submit" class="update-now">Update now!</button></form>
-      <button type="button" class="update-dismiss" id="update-dismiss" aria-label="Dismiss update notification">&times;</button>
-    </div>
+    {{template "update-banner" .}}
     {{if .Message}}<div class="alert">{{.Message}}</div>{{end}}
     <section>
       <div class="section-heading">
