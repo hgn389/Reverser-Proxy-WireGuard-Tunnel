@@ -127,8 +127,10 @@
         delete versionCheckStatus.dataset.state;
       }
     };
+    let checkSequence = 0;
     const refresh = async ({ showAfterCheck = false, force = false, announce = false } = {}) => {
       if (installForm?.dataset.installing) return;
+      const sequence = ++checkSequence;
       if (install) install.disabled = true;
       if (announce && versionCheck) {
         versionCheck.disabled = true;
@@ -146,7 +148,7 @@
           throw new Error(`HTTP ${response.status}`);
         }
         const update = await response.json();
-        if (installForm?.dataset.installing) return;
+        if (sequence !== checkSequence || installForm?.dataset.installing) return;
         if (latest) latest.textContent = update.latest || text("Unknown", "Chưa xác định");
         if (checked) checked.textContent = update.checked_at ? new Date(update.checked_at).toLocaleString(vi ? "vi-VN" : "en-US") : text("Unknown", "Chưa xác định");
         if (install) install.disabled = !update.available || !update.latest;
@@ -177,6 +179,7 @@
           banner.hidden = false;
         }
       } catch (_) {
+        if (sequence !== checkSequence || installForm?.dataset.installing) return;
         if (announce || latest) {
           setCheckStatus(text("Update check failed. Try again.", "Kiểm tra cập nhật thất bại. Vui lòng thử lại."), "error");
         }
@@ -184,7 +187,7 @@
         if (checked) checked.textContent = text("Check failed", "Kiểm tra thất bại");
         // Keep the dashboard usable when GitHub or the network is unavailable.
       } finally {
-        if (announce && versionCheck) {
+        if (sequence === checkSequence && !installForm?.dataset.installing && versionCheck) {
           versionCheck.disabled = false;
           versionCheck.removeAttribute("aria-busy");
         }

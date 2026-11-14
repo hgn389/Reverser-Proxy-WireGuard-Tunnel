@@ -2,7 +2,7 @@
 
 ## Quick Install
 
-### Web Panel Updates in v1.0.14
+### Web Panel Updates in v1.0.15
 
 Sửa CSS + Thêm ngôn ngữ
 
@@ -10,7 +10,7 @@ The **Update** link before **GitHub** in the authenticated header opens a dedica
 
 ### 1. VPS-1 — Reverse Proxy
 
-This v1.0.14 installer supports **Ubuntu Server 22.04 LTS and 24.04 LTS** on `amd64` and `arm64`. Run this command on a clean VPS:
+This v1.0.15 installer supports **Ubuntu Server 22.04 LTS and 24.04 LTS** on `amd64` and `arm64`. Run this command on a clean VPS:
 
 ```bash
 sudo apt update && sudo apt install -y ca-certificates curl git && git clone https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel.git rpctl && cd rpctl && sudo bash scripts/install.sh
