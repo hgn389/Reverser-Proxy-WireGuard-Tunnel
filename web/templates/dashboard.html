@@ -13,7 +13,7 @@
   <header>
     <div class="brand"><strong>Reverse Proxy &amp; VPN Tunnel</strong></div>
     <nav><a class="active" href="/">Dashboard</a><a href="/guide">Configuration Guide</a></nav>
-    <div class="header-actions"><a class="github-link" href="/update">Update</a><a class="github-link" href="https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel" target="_blank" rel="noopener noreferrer">GitHub</a><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="secondary">Sign out</button></form></div>
+    <div class="header-actions">{{template "language-switch" .}}<a class="github-link" href="/update">Update</a><a class="github-link" href="https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel" target="_blank" rel="noopener noreferrer">GitHub</a><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="secondary">Sign out</button></form></div>
   </header>
   <main>
     {{template "update-banner" .}}

@@ -61,6 +61,21 @@ label { display: grid; gap: .4rem; font-weight: 600; }
 input { width: 100%; padding: .7rem; border: 1px solid #484f58; border-radius: 6px; background: #0d1117; color: #e6edf3; }
 button { padding: .65rem .9rem; border: 0; border-radius: 6px; background: #238636; color: #fff; font-weight: 700; cursor: pointer; white-space: nowrap; }
 button:hover { filter: brightness(1.12); }
+button:disabled { background: #484f58; color: #a9b1ba; cursor: not-allowed; opacity: .75; }
+button:disabled:hover { filter: none; }
+.update-check { background: #bd561d; color: #fff; }
+.language-switch { display: inline-flex; align-items: center; gap: .4rem; background: #30363d; }
+.language-switch svg { flex: 0 0 24px; }
+.guide-commands { display: grid; gap: .65rem; margin: 1em 0; }
+.guide-command { display: flex; align-items: flex-start; gap: .75rem; margin: 0; }
+.guide-command code { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.guide-command-comment { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; opacity: .8; }
+.guide-copy { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; min-width: 36px; min-height: 36px; padding: .4rem; background: #30363d; }
+.guide-copy:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.guide-snippet { position: relative; }
+.guide-snippet > .guide-copy { position: absolute; right: .5rem; top: .5rem; }
+.guide-snippet > pre { padding-right: 3.5rem; }
+.guide-copy-status { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .secondary { background: #30363d; }
 .danger { background: #da3633; }
 .button-link { display: inline-flex; align-items: center; justify-content: center; padding: .65rem .9rem; border-radius: 6px; color: #fff; font-weight: 700; text-decoration: none; white-space: nowrap; }
@@ -224,7 +239,9 @@ footer a { text-decoration: none; }
 
 @media (max-width: 440px) {
   header { gap: .6rem; padding: .7rem; }
-  .header-actions { flex-wrap: wrap; justify-content: flex-end; max-width: 12rem; }
+  header { grid-template-columns: minmax(0, 1fr); }
+  .header-actions { grid-column: 1; grid-row: 2; flex-wrap: wrap; justify-content: flex-start; }
+  nav { grid-row: 3; }
   nav { gap: .15rem; }
   nav a { padding: .5rem .6rem; }
   .section-heading { display: grid; }

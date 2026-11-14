@@ -1,0 +1,319 @@
+{{define "guide_vi.html"}}
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Hướng dẫn cấu hình rpctl</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+  <script src="/static/guide.js" defer></script>
+</head>
+<body>
+  <header>
+    <div class="brand"><strong>Proxy ngược &amp; Đường hầm VPN</strong></div>
+    <nav>
+      <a href="/">Bảng điều khiển</a>
+      <a class="active" href="/guide">Hướng dẫn cấu hình</a>
+    </nav>
+    <div class="header-actions">{{template "language-switch" .}}<a class="github-link" href="/update">Cập nhật</a><a class="github-link" href="https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel" target="_blank" rel="noopener noreferrer">GitHub</a><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="secondary">Đăng xuất</button></form></div>
+  </header>
+  <main class="guide">
+    {{template "update-banner-vi" .}}
+    {{if eq .VPNMode "tailscale"}}
+    <section>
+      <h1>Hướng dẫn cấu hình Tailscale</h1>
+      <p>VPS-1 là máy chủ proxy ngược công khai. Các máy chủ từ VPS-2 đến VPS-N chạy website hoặc dịch vụ riêng tư. Mọi máy chủ và thiết bị khách đều đăng nhập vào cùng một mạng Tailscale (tailnet).</p>
+      <pre>Internet → VPS-1 (rpctl, Nginx, SSL, Tailscale)
+                    ↓ mạng Tailscale được mã hóa
+          VPS-2 100.x.x.x · VPS-3 100.x.x.x · thiết bị di động</pre>
+      <div class="guide-note"><strong>Kiểm soát quyền truy cập bằng chính sách tailnet.</strong> Chỉ cho phép người dùng và thiết bị đã được phê duyệt truy cập các dịch vụ web riêng tư.</div>
+    </section>
+
+    <section>
+      <h2>Bước 1: Cài đặt VPS-1</h2>
+      <p>Sử dụng VPS mới cài Ubuntu Server 22.04 LTS hoặc 24.04 LTS, có địa chỉ IPv4 công khai. Cho phép SSH và các cổng TCP 80, 443 trên tường lửa của nhà cung cấp.</p>
+      <pre><code>sudo apt update
+sudo apt install -y git
+git clone https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel.git rpctl
+cd rpctl
+sudo bash scripts/install.sh</code></pre>
+      <p>Chọn <strong>Tailscale</strong> làm nền tảng VPN. Trình cài đặt sẽ cài gói ổn định chính thức, khởi động <code>tailscaled</code> và hiển thị URL đăng nhập. Hoàn tất đăng nhập trước khi tiếp tục.</p>
+      <pre><code>sudo rpctl status
+sudo rpctl tailscale status
+tailscale ip -4</code></pre>
+    </section>
+
+    <section>
+      <h2>Bước 2: Thêm các máy chủ từ VPS-2 đến VPS-N</h2>
+      <p>Cài Tailscale trên từng máy chủ phía sau proxy (upstream) và đăng nhập vào cùng một tailnet. Làm theo hướng dẫn cài đặt Linux chính thức cho máy chủ đó, sau đó kiểm tra địa chỉ:</p>
+      <pre><code>curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up
+tailscale ip -4
+tailscale status</code></pre>
+      <p>Nếu tính năng phê duyệt thiết bị được bật, hãy phê duyệt máy chủ trong bảng quản trị Tailscale. Áp dụng các quyền truy cập (grants) hoặc ACL cho phép VPS-1 kết nối đến các cổng ứng dụng cần thiết.</p>
+    </section>
+
+    <section>
+      <h2>Bước 3: Chuẩn bị và kiểm tra website</h2>
+      <p>Chạy website trên máy chủ upstream và cấu hình để lắng nghe trên địa chỉ Tailscale của máy chủ hoặc <code>0.0.0.0</code>. Sử dụng địa chỉ thực do lệnh <code>tailscale ip -4</code> trả về.</p>
+      <pre><code># Chạy trên VPS-1 và thay địa chỉ ví dụ bằng địa chỉ thực
+ping -c 4 100.101.102.103
+curl -I -H 'Host: shop.example.com' http://100.101.102.103:80</code></pre>
+      <p>Thông thường, yêu cầu HTTP cần trả về mã 200, 301 hoặc 302 trước khi tạo proxy ngược.</p>
+    </section>
+
+    <section>
+      <h2>Bước 4: Thêm DNS, proxy ngược và SSL</h2>
+      <ol>
+        <li>Tạo bản ghi A cho <code>shop.example.com</code> trỏ đến địa chỉ IPv4 công khai của VPS-1.</li>
+        <li>Mở Bảng điều khiển và thêm <code>shop.example.com</code>.</li>
+        <li>Sử dụng địa chỉ Tailscale của thiết bị upstream, chẳng hạn <code>http://100.101.102.103:80</code>, hoặc tên MagicDNS của thiết bị.</li>
+        <li>Sau khi DNS đã trỏ đến VPS-1, cấp chứng chỉ SSL trong phần Proxy ngược.</li>
+      </ol>
+      <p>Lưu lượng công khai được tiếp nhận tại VPS-1. Kết nối từ VPS-1 đến máy chủ upstream đi qua Tailscale.</p>
+    </section>
+
+    <section>
+      <h2>Kết nối máy tính hoặc thiết bị di động</h2>
+      <ol>
+        <li>Cài ứng dụng Tailscale chính thức trên Windows, macOS, iOS hoặc Android.</li>
+        <li>Đăng nhập vào cùng tailnet mà VPS-1 đang sử dụng.</li>
+        <li>Phê duyệt thiết bị nếu tính năng phê duyệt thiết bị của tailnet được bật.</li>
+        <li>Xác nhận chính sách tailnet cho phép thiết bị truy cập đúng máy chủ và cổng cần dùng.</li>
+        <li>Mở dịch vụ riêng tư qua địa chỉ IP Tailscale hoặc tên MagicDNS.</li>
+      </ol>
+      <p>Tailscale không sử dụng các tệp cấu hình peer WireGuard hoặc mã QR được hiển thị trong chế độ WireGuard.</p>
+    </section>
+
+    <section>
+      <h2>Sự cố thường gặp</h2>
+      <ul>
+        <li><strong>Không thấy thiết bị:</strong> xác nhận thiết bị đã đăng nhập vào cùng tailnet và đã được phê duyệt.</li>
+        <li><strong>Ping hoặc HTTP bị chặn:</strong> kiểm tra grants hoặc ACL của tailnet và tường lửa trên máy chủ upstream.</li>
+        <li><strong>Lỗi 502 Bad Gateway:</strong> VPS-1 không thể kết nối đến địa chỉ và cổng upstream đã cấu hình.</li>
+        <li><strong>Không thể gia hạn SSL:</strong> duy trì DNS công khai trỏ đến VPS-1 và bảo đảm cổng 80 có thể truy cập để xác thực HTTP-01.</li>
+      </ul>
+      <pre><code>sudo rpctl status
+sudo rpctl tailscale status
+tailscale netcheck
+sudo rpctl system nginx-test</code></pre>
+    </section>
+    {{else}}
+    <section>
+      <h1>Hướng dẫn cấu hình</h1>
+      <p>VPS-1 là máy chủ proxy ngược công khai. Các máy chủ từ VPS-2 đến VPS-N chạy website hoặc dịch vụ riêng tư. Mỗi máy chủ hoặc thiết bị tham gia WireGuard phải sử dụng cấu hình peer riêng.</p>
+      <pre>Internet → VPS-1 (rpctl, Nginx, SSL, WireGuard 10.10.10.1)
+                    ↓ đường hầm WireGuard được mã hóa
+          VPS-2 10.10.10.2 · VPS-3 10.10.10.3 · VPS-N</pre>
+      <div class="guide-note"><strong>Giữ bí mật mọi cấu hình máy khách.</strong> Tệp cấu hình chứa khóa riêng WireGuard. Không bao giờ dùng chung một cấu hình cho hai thiết bị.</div>
+    </section>
+
+    <section>
+      <h2>Bước 1: Cài đặt VPS-1</h2>
+      <p>Sử dụng VPS mới cài Ubuntu Server 22.04 LTS hoặc 24.04 LTS, có địa chỉ IPv4 công khai. Cho phép SSH, các cổng TCP 80, 443 và cổng UDP 51820 trên tường lửa của nhà cung cấp.</p>
+      <pre><code>sudo apt update
+sudo apt install -y git
+git clone https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel.git rpctl
+cd rpctl
+sudo bash scripts/install.sh</code></pre>
+      <p>Chọn <strong>Chế độ mạng riêng WireGuard</strong>, chọn mạng con mặc định <code>10.10.10.0/24</code> và chọn <strong>acme.sh</strong>. Trình cài đặt gán địa chỉ <code>10.10.10.1</code> cho VPS-1 và <code>10.10.10.2</code> cho máy khách đầu tiên. Với các máy chủ rpctl độc lập, hãy chọn mạng con riêng khác nhau cho từng bản cài đặt, chẳng hạn <code>10.20.0.0/24</code> và <code>10.30.0.0/24</code>.</p>
+      <pre><code>sudo rpctl status
+sudo rpctl wg peer list
+sudo rp</code></pre>
+      <p>Tệp cấu hình máy khách đầu tiên nằm tại:</p>
+      <pre><code>/etc/rpctl/wireguard/peers/client1.conf</code></pre>
+    </section>
+
+    <section>
+      <h2>Bước 2: Sao chép client1.conf sang VPS-2</h2>
+      <p>Sao chép <code>client1.conf</code> từ VPS-1 đến <code>/root/client1.conf</code> trên VPS-2. Bạn có thể dùng SCP, SFTP hoặc WinSCP. Xóa các bản sao tạm sau khi cài đặt.</p>
+      <p>Ví dụ sử dụng SCP, chạy từ một máy tính đáng tin cậy có thể kết nối đến cả hai máy chủ:</p>
+      <pre><code>scp root@VPS1_PUBLIC_IP:/etc/rpctl/wireguard/peers/client1.conf ./client1.conf
+scp ./client1.conf root@VPS2_IP:/root/client1.conf</code></pre>
+    </section>
+
+    <section>
+      <h2>Bước 3: Cài WireGuard trên VPS-2 hoặc Orange Pi</h2>
+      <p>Chạy trên VPS-2. Ubuntu, Debian và Armbian sử dụng cùng các lệnh sau:</p>
+      <pre><code>sudo apt update
+sudo apt install -y --no-install-recommends wireguard-tools
+sudo install -d -m 700 /etc/wireguard
+sudo install -m 600 /root/client1.conf /etc/wireguard/wg0.conf
+sudo systemctl enable --now wg-quick@wg0
+sudo rm -f /root/client1.conf</code></pre>
+      <p>Kiểm tra giao diện mạng và đường hầm trên VPS-2:</p>
+      <pre><code>ip address show wg0
+sudo wg show
+ping -c 4 10.10.10.1</code></pre>
+      <p>Kiểm tra kết nối đến VPS-2 từ VPS-1:</p>
+      <pre><code>ping -c 4 10.10.10.2
+sudo wg show</code></pre>
+      <p>Nếu có lần bắt tay gần đây và ping thành công, đường hầm đã sẵn sàng.</p>
+    </section>
+
+    <section>
+      <h2>Bước 4: Chuẩn bị website trên VPS-2</h2>
+      <p>Tạo website trong aaPanel hoặc máy chủ web của bạn bằng tên miền thực, ví dụ <code>shop.example.com</code>. Máy chủ web phải lắng nghe trên <code>10.10.10.2:80</code> hoặc <code>0.0.0.0:80</code>.</p>
+      <p>Nếu UFW đang bật trên VPS-2, cho phép VPS-1 truy cập website qua WireGuard:</p>
+      <pre><code>sudo ufw allow in on wg0 from 10.10.10.1 to any port 80 proto tcp</code></pre>
+      <p>Kiểm tra website từ VPS-1 trước khi tạo proxy ngược:</p>
+      <pre><code>curl -I -H 'Host: shop.example.com' http://10.10.10.2:80</code></pre>
+      <p>Thông thường, phản hồi cần có mã HTTP 200, 301 hoặc 302. SSL công khai được cài trên VPS-1; chặng HTTP nội bộ đã được WireGuard mã hóa.</p>
+    </section>
+
+    <section>
+      <h2>Bước 5: Thêm DNS, proxy ngược và SSL</h2>
+      <ol>
+        <li>Tạo bản ghi A cho <code>shop.example.com</code> trỏ đến địa chỉ IPv4 công khai của VPS-1.</li>
+        <li>Mở Bảng điều khiển, nhập tên miền và URL upstream đầy đủ.</li>
+        <li>Sử dụng <code>http://10.10.10.2:80</code> làm upstream.</li>
+        <li>Sau khi DNS đã trỏ đến VPS-1, chọn <strong>Cấp SSL</strong>.</li>
+        <li>Nếu dùng Cloudflare, chọn <strong>Full (Strict)</strong> sau khi chứng chỉ trên VPS-1 có hiệu lực.</li>
+      </ol>
+      <pre><code>curl -I https://shop.example.com
+sudo rpctl ssl status shop.example.com</code></pre>
+      <p>Bộ hẹn giờ SSL kiểm tra chứng chỉ hằng ngày và acme.sh sẽ gia hạn trước khi hết hạn, miễn là DNS vẫn trỏ đúng và cổng 80 vẫn có thể truy cập.</p>
+    </section>
+
+    <section>
+      <h2>Thêm các máy chủ từ VPS-3 đến VPS-N</h2>
+      <h3>1. Tạo một peer cho máy chủ mới</h3>
+      <p>Trên VPS-1, vào Bảng điều khiển → <strong>Peer WireGuard - Thêm thiết bị</strong> → <strong>Tạo peer</strong>, chọn mục 13 trong menu dòng lệnh hoặc dùng lệnh sau:</p>
+      <pre><code>sudo rpctl wg peer add
+sudo rpctl wg peer list</code></pre>
+      <p>Để chọn địa chỉ VPN khi tạo peer, nhập số cuối của địa chỉ vào trường <strong>IP VPN nội bộ (tùy chọn)</strong> sau trường <strong>Tên peer (tùy chọn)</strong>, hoặc dùng lệnh như <code>sudo rpctl wg peer add home-server --ip-last-octet 25</code>. Với mạng con mặc định, thao tác này chọn <code>10.10.10.25/32</code>. Để trống trường này nếu muốn cấp phát tự động. Nhập một số nguyên từ 1 đến 254; địa chỉ phải thuộc mạng con đã cấu hình và không được là địa chỉ máy chủ, địa chỉ dành riêng hoặc địa chỉ đang được sử dụng.</p>
+      <p>Peer bổ sung đầu tiên thường là <code>client2</code> với địa chỉ <code>10.10.10.3/32</code>. Tải tệp từ Bảng điều khiển hoặc sao chép tệp sau:</p>
+      <pre><code>/etc/rpctl/wireguard/peers/client2.conf</code></pre>
+
+      <h3>2. Cài đặt trên VPS-3</h3>
+      <p>Sao chép tệp đến <code>/root/client2.conf</code> trên VPS-3, sau đó chạy:</p>
+      <pre><code>sudo apt update
+sudo apt install -y --no-install-recommends wireguard-tools
+sudo install -d -m 700 /etc/wireguard
+sudo install -m 600 /root/client2.conf /etc/wireguard/wg0.conf
+sudo systemctl enable --now wg-quick@wg0
+sudo rm -f /root/client2.conf
+ip address show wg0
+sudo wg show
+ping -c 4 10.10.10.1</code></pre>
+
+      <h3>3. Kiểm tra từ VPS-1 và thêm website</h3>
+      <pre><code>ping -c 4 10.10.10.3
+curl -I -H 'Host: api.example.com' http://10.10.10.3:80</code></pre>
+      <p>Sử dụng <code>http://10.10.10.3:80</code> làm upstream. Lặp lại các bước này cho từng máy chủ bổ sung. Địa chỉ đã xóa có thể được cấp lại, vì vậy luôn kiểm tra bằng <code>rpctl wg peer list</code> thay vì đoán địa chỉ.</p>
+      <div class="example-grid">
+        <div><strong>VPS-2 · client1</strong><code>10.10.10.2</code></div>
+        <div><strong>VPS-3 · client2</strong><code>10.10.10.3</code></div>
+        <div><strong>VPS-4 · client3</strong><code>10.10.10.4</code></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Kết nối máy tính Windows</h2>
+      <ol>
+        <li>Cài ứng dụng WireGuard chính thức từ <a href="https://www.wireguard.com/install/" target="_blank" rel="noopener noreferrer">wireguard.com/install</a>.</li>
+        <li>Tạo peer riêng trên VPS-1, ví dụ <code>sudo rpctl wg peer add windows-laptop</code>.</li>
+        <li>Tải <code>windows-laptop.conf</code> từ Bảng điều khiển.</li>
+        <li>Mở WireGuard trên Windows và chọn <strong>Nhập đường hầm từ tệp</strong>.</li>
+        <li>Chọn tệp đã tải và kích hoạt đường hầm.</li>
+        <li>Mở PowerShell và chạy <code>ping 10.10.10.1</code>.</li>
+      </ol>
+      <p>Trên VPS-1, chạy <code>sudo wg show</code> và xác nhận peer Windows có lần bắt tay gần đây.</p>
+    </section>
+
+    <section>
+      <h2>Kết nối iPhone, iPad hoặc thiết bị Android</h2>
+      <ol>
+        <li>Cài ứng dụng WireGuard chính thức từ Apple App Store hoặc Google Play qua <a href="https://www.wireguard.com/install/" target="_blank" rel="noopener noreferrer">wireguard.com/install</a>.</li>
+        <li>Tạo peer riêng cho mỗi thiết bị, chẳng hạn <code>iphone-nam</code> hoặc <code>android-phone</code>.</li>
+        <li>Trong ứng dụng WireGuard, thêm đường hầm bằng mã QR. Trên Bảng điều khiển, chọn <strong>Xem QR</strong> của peer đó rồi quét mã trong cửa sổ bật lên. Bạn cũng có thể tải và nhập tệp <code>.conf</code> của peer.</li>
+        <li>Kích hoạt đường hầm, sau đó kiểm tra <code>sudo wg show</code> trên VPS-1 để xác nhận có lần bắt tay gần đây.</li>
+        <li>Mở một website hoặc dịch vụ riêng tư đã biết qua địa chỉ <code>10.10.10.x</code> để kiểm tra quyền truy cập.</li>
+      </ol>
+      <p>Cả mã QR và cấu hình tải về đều chứa khóa riêng của peer. Không chụp lại, chia sẻ hoặc dùng lại chúng trên thiết bị khác. Xóa tệp cấu hình đã tải sau khi nhập.</p>
+      <p>Chế độ mạng riêng chỉ định tuyến <code>10.10.10.0/24</code> qua WireGuard, vì vậy lưu lượng Internet thông thường vẫn sử dụng kết nối hiện tại của thiết bị.</p>
+      <p>Để dùng địa chỉ IPv4 công khai của VPS-1 khi truy cập Internet, chọn công tắc <strong>Chế độ</strong> của peer trên Bảng điều khiển và xác nhận <strong>Toàn bộ lưu lượng qua VPN</strong>. Tắt đường hầm trên thiết bị, thay bằng tệp <code>.conf</code> đã cập nhật hoặc quét mã QR mới, rồi bật lại. Khi chuyển về <strong>Mạng riêng</strong>, cũng cần cập nhật thiết bị theo cách tương tự. Mỗi peer có thể dùng một chế độ khác nhau. Chế độ toàn bộ lưu lượng qua VPN chỉ định tuyến IPv4; IPv6 vẫn dùng kết nối thông thường của thiết bị.</p>
+    </section>
+
+    <section>
+      <h2>Sự cố thường gặp</h2>
+      <ul>
+        <li><strong>Không có lần bắt tay:</strong> cho phép UDP 51820 trên tường lửa của nhà cung cấp VPS và xác nhận điểm cuối của máy khách dùng IP công khai của VPS-1.</li>
+        <li><strong>Ping được nhưng website không truy cập được:</strong> kiểm tra máy chủ web gốc, địa chỉ lắng nghe, cổng, quy tắc UFW và cấu hình máy chủ ảo của tên miền.</li>
+        <li><strong>Lỗi 502 Bad Gateway:</strong> VPS-1 không thể kết nối đến upstream đã cấu hình.</li>
+        <li><strong>Lỗi 522 Connection timed out:</strong> Cloudflare không thể kết nối đến cổng TCP 80 hoặc 443 trên VPS-1.</li>
+        <li><strong>Không thể gia hạn SSL:</strong> duy trì DNS trỏ đến VPS-1 và bảo đảm cổng 80 công khai có thể truy cập để xác thực HTTP-01.</li>
+        <li><strong>Đăng nhập bảng quản trị web bị chặn:</strong> dùng mục 11 trong menu <code>sudo rp</code> để bỏ chặn IP máy khách.</li>
+      </ul>
+      <pre><code>sudo rpctl status
+sudo rpctl system nginx-test
+sudo rpctl ssl status
+sudo rpctl wg peer list
+sudo wg show</code></pre>
+    </section>
+    {{end}}
+
+    <section id="redirect-loops">
+      <h2>Quá nhiều lần chuyển hướng (ERR_TOO_MANY_REDIRECTS)</h2>
+      <p>Nếu HTTPS liên tục chuyển hướng đến cùng một URL, hãy kiểm tra riêng từng chặng kết nối. Xóa cookie trình duyệt không khắc phục được vòng lặp chuyển hướng phía máy chủ. Hai vòng lặp độc lập có thể tồn tại đồng thời.</p>
+      <pre>Khách truy cập → HTTPS → Cloudflare (tùy chọn)
+        → HTTPS :443 → proxy ngược VPS-1
+        → HTTP qua VPN riêng → website trên VPS-2</pre>
+
+      <h3>1. Kiểm tra chặng từ Cloudflare đến VPS-1</h3>
+      <p>Trước tiên, cấp chứng chỉ hợp lệ trên VPS-1, sau đó chọn <strong>SSL/TLS → Tổng quan → Full (Strict)</strong> trong Cloudflare. Không dùng <strong>Flexible</strong>: chế độ này gửi HTTP đến VPS-1, khiến VPS-1 có thể chuyển hướng trở lại cùng URL HTTPS công khai. Nếu đã chọn Full (Strict), hãy kiểm tra Quy tắc cấu hình và Quy tắc máy chủ gốc xem có thiết lập nào ghi đè SSL hoặc cổng máy chủ gốc hay không.</p>
+      <p>Thay tên miền ví dụ và <code>VPS1_PUBLIC_IP</code> bằng giá trị thực. Chạy các lệnh sau từ máy tính có thể kết nối đến VPS-1. <code>--resolve</code> bỏ qua Cloudflare nhưng vẫn giữ tên máy chủ và xác minh chứng chỉ TLS; không thêm <code>-k</code>.</p>
+      <pre><code># Đường truy cập công khai, bao gồm Cloudflare nếu được bật
+curl -I -L --max-redirs 5 https://shop.example.com/
+
+# HTTPS trực tiếp đến VPS-1, bỏ qua Cloudflare
+curl -I --resolve shop.example.com:443:VPS1_PUBLIC_IP https://shop.example.com/</code></pre>
+      <p>Nếu HTTPS trực tiếp thành công nhưng đường truy cập công khai bị lặp chuyển hướng, hãy kiểm tra thiết lập SSL, các quy tắc và máy chủ gốc được cấu hình trong DNS của Cloudflare. Chỉ riêng phép so sánh này không chứng minh rằng Flexible đang được bật.</p>
+
+      <h3>2. Kiểm tra chặng từ VPS-1 đến máy chủ website</h3>
+      <p>Chạy trên VPS-1, thay địa chỉ máy chủ phía sau (backend) bằng địa chỉ WireGuard hoặc Tailscale thực:</p>
+      <pre><code>curl -I -H 'Host: shop.example.com' \
+  -H 'X-Forwarded-Proto: https' http://10.10.10.2:80/</code></pre>
+      <p>rpctl đã gửi các tiêu đề <code>Host</code> và <code>X-Forwarded-Proto</code>. Tuy nhiên, quy tắc vô điều kiện trên backend như <code>if ($scheme = http)</code> vẫn gây chuyển hướng: kết nối đến backend thực sự là HTTP, ngay cả khi khách truy cập dùng HTTPS. Việc liên tục chuyển hướng đến <code>https://shop.example.com/</code> cần được kiểm tra, không được coi là kết quả kiểm tra upstream thành công. WordPress hoặc ứng dụng khác cũng có thể chuyển hướng nếu không nhận biết được kết nối HTTPS ban đầu.</p>
+
+      <h3>3. Khắc phục Nginx và WordPress trong aaPanel trên VPS-2</h3>
+      <div class="guide-note"><strong>Sao lưu cấu hình website trước khi chỉnh sửa.</strong> Đây là các thay đổi thủ công trên backend, không phải thiết lập mà rpctl áp dụng từ xa. Thay <code>10.10.10.1</code> bằng IP nguồn riêng thực tế của VPS-1 và thay tên miền ví dụ bằng tên miền thực. Với Tailscale, dùng IP Tailscale của VPS-1. Không tin cậy tiêu đề chuyển tiếp từ mọi máy khách hoặc cả một mạng con khi không cần thiết.</div>
+      <p>Trong <strong>aaPanel → Website → tên miền của bạn → Cấu hình</strong>, thay quy tắc chuyển HTTP sang HTTPS vô điều kiện hiện có bằng đoạn sau, đặt bên trong khối <code>server</code> của website đó. Giữ nguyên các quy tắc không liên quan. Cấu hình này yêu cầu mô-đun HTTP real-IP của Nginx.</p>
+      <pre><code># Chỉ tin cậy thông tin chuyển tiếp HTTPS từ proxy ngược riêng.
+set $rpctl_original_scheme $scheme;
+set $rpctl_proxy_source "$realip_remote_addr:$http_x_forwarded_proto";
+if ($rpctl_proxy_source = "10.10.10.1:https") {
+    set $rpctl_original_scheme https;
+}
+if ($rpctl_original_scheme = http) {
+    return 301 https://shop.example.com$request_uri;
+}</code></pre>
+      <p>Xóa mọi quy tắc buộc dùng HTTPS trùng lặp vẫn chỉ kiểm tra <code>$scheme</code>. Không bật lại công tắc buộc dùng HTTPS của aaPanel nếu thao tác đó tạo lại quy tắc này. Vẫn duy trì chuyển hướng HTTP sang HTTPS trên proxy công khai VPS-1.</p>
+      <p>Với WordPress, thêm đoạn sau vào <code>wp-config.php</code> của website trước khi tệp này nạp <code>wp-settings.php</code>. Giữ các URL của website WordPress ở dạng HTTPS.</p>
+      <pre><code>// Chỉ proxy riêng đáng tin cậy mới được khai báo giao thức HTTPS ban đầu.
+if (
+    ($_SERVER['REMOTE_ADDR'] ?? '') === '10.10.10.1'
+    &amp;&amp; ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https'
+) {
+    $_SERVER['HTTPS'] = 'on';
+    $_SERVER['SERVER_PORT'] = '443';
+    $_SERVER['REQUEST_SCHEME'] = 'https';
+}</code></pre>
+      <p><strong>Lưu ý về Real-IP:</strong> ví dụ PHP này giả định <code>REMOTE_ADDR</code> vẫn chứa IP riêng của VPS-1. Nếu Nginx thay giá trị này bằng IP khách truy cập, hãy truyền một tham số FastCGI do máy chủ kiểm soát, dựa trên địa chỉ kết nối gốc đáng tin cậy, rồi sử dụng tham số đó trong ứng dụng. Không bỏ bước kiểm tra IP nguồn để tin tưởng mù quáng vào <code>HTTP_X_FORWARDED_PROTO</code>.</p>
+      <p>Với bản cài đặt aaPanel tiêu chuẩn, kiểm tra Nginx trước khi nạp lại cấu hình. Nếu kiểm tra thất bại, khôi phục hoặc sửa cấu hình và không nạp lại:</p>
+      <pre><code>sudo /www/server/nginx/sbin/nginx -t
+# Chỉ chạy sau khi kiểm tra cấu hình thành công:
+sudo /www/server/nginx/sbin/nginx -s reload</code></pre>
+
+      <h3>4. Kiểm tra và ngăn sự cố tái diễn</h3>
+      <p>Lặp lại cả kiểm tra upstream từ VPS-1 và kiểm tra HTTPS công khai. Thông thường, trang chủ phải kết thúc ở phản hồi <code>200 OK</code>, không liên tục chuyển hướng về chính nó. Đồng thời, xác nhận các yêu cầu HTTP trực tiếp đến backend từ nguồn không đáng tin cậy không thể vượt qua yêu cầu HTTPS bằng cách giả mạo tiêu đề chuyển tiếp. Nếu curl thành công nhưng trình duyệt vẫn bị lặp, thử cửa sổ riêng tư để loại trừ chuyển hướng đã lưu trong bộ nhớ đệm.</p>
+      <p>Áp dụng mẫu cấu hình backend này cho mỗi website mới, hoặc duy trì một mẫu máy chủ ảo aaPanel đã được rà soát cùng cơ chế nhận biết HTTPS phù hợp cho từng ứng dụng. Khôi phục cấu hình máy chủ ảo cũ hoặc <code>wp-config.php</code> cũ có thể làm lỗi xuất hiện trở lại, vì vậy hãy kiểm tra các thiết lập này sau mỗi lần khôi phục. Nếu có thể, giới hạn quyền truy cập backend chỉ cho proxy được chỉ định.</p>
+      <p><strong>Phương án dùng upstream HTTPS:</strong> chuyển sang <code>https://BACKEND:443</code> yêu cầu dịch vụ TLS đang lắng nghe và có thể truy cập, cùng chứng chỉ hợp lệ khớp với tên máy chủ upstream. rpctl xác minh chứng chỉ upstream và sử dụng tên máy chủ upstream cho TLS SNI; chứng chỉ dành cho tên miền công khai thường không khớp với IP riêng. Không tắt xác minh chứng chỉ để che giấu sự không khớp này hoặc trỏ upstream ngược về proxy công khai.</p>
+    </section>
+  </main>
+  <footer><strong>rpctl v{{.Version}}</strong><span aria-hidden="true">&copy;</span><span>phát triển bởi <a href="https://hoanggiangnam.com" target="_blank" rel="noopener noreferrer">Nam Hoàng</a></span></footer>
+</body>
+</html>
+{{end}}

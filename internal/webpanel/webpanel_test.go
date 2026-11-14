@@ -480,6 +480,23 @@ func TestLoginSessionAndCSRF(t *testing.T) {
 		}
 	}
 	updateDenied := httptest.NewRecorder()
+	for _, path := range []string{"/guide", "/update"} {
+		translated := httptest.NewRecorder()
+		request = httptest.NewRequest(http.MethodGet, "https://panel.example.com"+path, nil)
+		request.AddCookie(sessionCookieValue)
+		request.AddCookie(&http.Cookie{Name: "rpctl-language", Value: "vi"})
+		handler.ServeHTTP(translated, request)
+		if translated.Code != http.StatusOK || !strings.Contains(translated.Body.String(), `lang="vi"`) || !strings.Contains(translated.Body.String(), `id="language-switch"`) {
+			t.Fatalf("Vietnamese page %s failed: status=%d body=%s", path, translated.Code, translated.Body.String())
+		}
+	}
+	translatedLogin := httptest.NewRecorder()
+	request = httptest.NewRequest(http.MethodGet, "https://panel.example.com/login", nil)
+	request.AddCookie(&http.Cookie{Name: "rpctl-language", Value: "vi"})
+	handler.ServeHTTP(translatedLogin, request)
+	if !strings.Contains(translatedLogin.Body.String(), "Tên đăng nhập") {
+		t.Fatal("Vietnamese login translation missing")
+	}
 	request = formRequest("https://panel.example.com/system/update", url.Values{"csrf": {"wrong"}}, sessionCookieValue)
 	handler.ServeHTTP(updateDenied, request)
 	if updateDenied.Code != http.StatusForbidden {
@@ -524,6 +541,40 @@ func TestLoginRateLimit(t *testing.T) {
 	server.attempts["192.0.2.1"] = loginAttempt{Failures: 5, ResetAt: time.Now().Add(time.Minute)}
 	if !server.loginBlocked("192.0.2.1") {
 		t.Fatal("five failed attempts were not blocked")
+	}
+}
+
+func TestVietnameseTemplatesAndUpdateStyles(t *testing.T) {
+	server, err := NewServer(testConfig(t), "1.0.14", testStore(t), &recordingClient{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mode := range []string{"wireguard", "tailscale"} {
+		var output bytes.Buffer
+		if err := server.templates.ExecuteTemplate(&output, "dashboard_vi.html", dashboardData{Language: "vi", VPNMode: mode}); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(output.String(), `lang="vi"`) || !strings.Contains(output.String(), `id="language-switch"`) {
+			t.Fatal("Vietnamese dashboard or language selector missing")
+		}
+		output.Reset()
+		if err := server.templates.ExecuteTemplate(&output, "guide_vi.html", guideData{Language: "vi", VPNMode: mode}); err != nil {
+			t.Fatal(err)
+		}
+		for _, expected := range []string{"ERR_TOO_MANY_REDIRECTS", "/static/guide.js", "Full (Strict)", "X-Forwarded-Proto"} {
+			if !strings.Contains(output.String(), expected) {
+				t.Errorf("Vietnamese %s guide missing %q", mode, expected)
+			}
+		}
+	}
+	css, err := fs.ReadFile(webassets.Files, "static/style.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"button:disabled { background: #484f58", ".update-check { background: #bd561d", ".guide-command", ".language-switch"} {
+		if !strings.Contains(string(css), expected) {
+			t.Errorf("update and language CSS missing %q", expected)
+		}
 	}
 }
 

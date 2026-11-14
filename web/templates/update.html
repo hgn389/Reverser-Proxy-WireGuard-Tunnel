@@ -1,3 +1,16 @@
+{{define "language-switch"}}
+<button type="button" class="language-switch" id="language-switch" title="English | Tiếng Việt" aria-label="English | Tiếng Việt">
+  {{if eq .Language "vi"}}<svg class="language-flag" width="24" height="16" viewBox="0 0 30 20" aria-hidden="true"><path fill="#da251d" d="M0 0h30v20H0z"/><path fill="#ff0" d="m15 4 1.35 4.15h4.36l-3.53 2.56 1.35 4.15L15 12.3l-3.53 2.56 1.35-4.15-3.53-2.56h4.36z"/></svg><span>Tiếng Việt</span>{{else}}<svg class="language-flag" width="24" height="16" viewBox="0 0 60 40" aria-hidden="true"><path fill="#012169" d="M0 0h60v40H0z"/><path stroke="#fff" stroke-width="8" d="m0 0 60 40M60 0 0 40"/><path stroke="#c8102e" stroke-width="3" d="m0 0 60 40M60 0 0 40"/><path stroke="#fff" stroke-width="13" d="M30 0v40M0 20h60"/><path stroke="#c8102e" stroke-width="8" d="M30 0v40M0 20h60"/></svg><span>English</span>{{end}}
+</button>
+{{end}}
+{{define "update-banner-vi"}}
+<div class="update-banner" id="update-banner" data-session="{{.CSRF}}" role="status" hidden>
+  <svg class="update-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg>
+  <span>Đã có phiên bản mới <strong id="update-version"></strong>.</span>
+  <a class="update-now" href="/update">Cập nhật ngay!</a>
+  <button type="button" class="update-dismiss" id="update-dismiss" aria-label="Đóng thông báo cập nhật">&times;</button>
+</div>
+{{end}}
 {{define "update-banner"}}
 <div class="update-banner" id="update-banner" data-session="{{.CSRF}}" role="status" hidden>
   <svg class="update-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg>
@@ -21,7 +34,7 @@
   <header>
     <div class="brand"><strong>Reverse Proxy &amp; VPN Tunnel</strong></div>
     <nav><a href="/">Dashboard</a><a href="/guide">Configuration Guide</a></nav>
-    <div class="header-actions"><a class="github-link active" href="/update" aria-current="page">Update</a><a class="github-link" href="https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel" target="_blank" rel="noopener noreferrer">GitHub</a><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="secondary">Sign out</button></form></div>
+    <div class="header-actions">{{template "language-switch" .}}<a class="github-link active" href="/update" aria-current="page">Update</a><a class="github-link" href="https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel" target="_blank" rel="noopener noreferrer">GitHub</a><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="secondary">Sign out</button></form></div>
   </header>
   <main>
     {{template "update-banner" .}}
@@ -33,8 +46,8 @@
         <dt>Latest version</dt><dd id="update-latest">Not checked</dd>
         <dt>Last checked</dt><dd id="update-checked">Not checked</dd>
       </dl>
-      <p id="version-check-status" role="status" aria-live="polite">Checking for updates...</p>
-      <button type="button" class="secondary" id="version-check" data-version="v{{.Version}}" title="Check for updates">Check for updates</button>
+      <p class="version-check-status" id="version-check-status" role="status" aria-live="polite">Checking for updates...</p>
+      <button type="button" class="update-check" id="version-check" data-version="v{{.Version}}" title="Check for updates">Check for updates</button>
       <form method="post" action="/system/update" id="update-install-form">
         <input type="hidden" name="csrf" value="{{.CSRF}}">
         <p>The binary and SHA256SUMS are downloaded from the official GitHub release. The panel may restart and briefly disconnect. Website and VPN settings are preserved. The result returns to Dashboard.</p>

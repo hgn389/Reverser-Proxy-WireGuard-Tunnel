@@ -71,6 +71,7 @@ type Server struct {
 }
 
 type dashboardData struct {
+	Language       string
 	Version        string
 	PanelDomain    string
 	PublicURL      string
@@ -94,15 +95,17 @@ type dashboardSite struct {
 }
 
 type loginData struct {
-	Version string
-	CSRF    string
-	Error   string
+	Language string
+	Version  string
+	CSRF     string
+	Error    string
 }
 
 type guideData struct {
-	Version string
-	CSRF    string
-	VPNMode string
+	Language string
+	Version  string
+	CSRF     string
+	VPNMode  string
 }
 
 type systemMetrics struct {
@@ -233,7 +236,7 @@ func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
 	}
 	cookieName, secure := loginCookieForRequest(r)
 	http.SetCookie(w, authCookie(cookieName, token, 10*time.Minute, secure))
-	s.render(w, "login.html", loginData{Version: s.version, CSRF: token})
+	s.renderPage(w, r, "login.html", loginData{Version: s.version, CSRF: token})
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
@@ -291,7 +294,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		http.SetCookie(w, authCookie(loginCookieName, token, 10*time.Minute, secure))
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusUnauthorized)
-		s.render(w, "login.html", loginData{Version: s.version, CSRF: token, Error: "Invalid username or password."})
+		s.renderPage(w, r, "login.html", loginData{Version: s.version, CSRF: token, Error: "Invalid username or password."})
 		return
 	}
 	s.clearLoginFailures(sourceIP)
@@ -341,7 +344,7 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 		tailscaleStatus, tailscaleError = s.tailscaleStatus()
 	}
 	certificateStatuses, certificateError := s.certificateStatuses()
-	s.render(w, "dashboard.html", dashboardData{
+	s.renderPage(w, r, "dashboard.html", dashboardData{
 		Version:        s.version,
 		PanelDomain:    s.config.Domain,
 		PublicURL:      PublicURL(s.config),
@@ -426,7 +429,7 @@ func buildDashboardSites(sites []proxy.Site, statuses []certificateStatus, statu
 
 func (s *Server) guide(w http.ResponseWriter, r *http.Request) {
 	current, _ := s.currentSession(r)
-	s.render(w, "guide.html", guideData{
+	s.renderPage(w, r, "guide.html", guideData{
 		Version: s.version,
 		CSRF:    current.CSRF,
 		VPNMode: string(vpnmode.Detect()),
@@ -435,7 +438,7 @@ func (s *Server) guide(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) updatePage(w http.ResponseWriter, r *http.Request) {
 	current, _ := s.currentSession(r)
-	s.render(w, "update.html", guideData{Version: s.version, CSRF: current.CSRF})
+	s.renderPage(w, r, "update.html", guideData{Version: s.version, CSRF: current.CSRF})
 }
 
 func (s *Server) tailscaleStatus() (tailscale.Status, string) {
@@ -805,6 +808,51 @@ func (s *Server) clearLoginFailures(ip string) {
 	s.attemptsMu.Lock()
 	delete(s.attempts, ip)
 	s.attemptsMu.Unlock()
+}
+
+func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, name string, data any) {
+	language := "en"
+	if cookie, err := r.Cookie("rpctl-language"); err == nil && cookie.Value == "vi" {
+		language = "vi"
+	}
+	switch value := data.(type) {
+	case dashboardData:
+		value.Language = language
+		if language == "vi" {
+			value.Message = translatePanelMessage(value.Message)
+			value.PeerError = translatePanelMessage(value.PeerError)
+			value.TailscaleError = translatePanelMessage(value.TailscaleError)
+			metrics := strings.NewReplacer("unavailable", "Không khả dụng", " used", " đã dùng")
+			value.Metrics.RAM = metrics.Replace(value.Metrics.RAM)
+			value.Metrics.SSD = metrics.Replace(value.Metrics.SSD)
+			value.Metrics.Swap = metrics.Replace(value.Metrics.Swap)
+			value.Metrics.Uptime = metrics.Replace(value.Metrics.Uptime)
+			labels := map[string]string{"Unknown": "Chưa xác định", "Error": "Lỗi", "Missing": "Chưa có", "Expired": "Hết hạn", "<1 day": "<1 ngày", "1 day": "1 ngày"}
+			for i := range value.Sites {
+				value.Sites[i].SSLError = translatePanelMessage(value.Sites[i].SSLError)
+				days := value.Sites[i].SSLDays
+				if translated, ok := labels[days]; ok {
+					value.Sites[i].SSLDays = translated
+				} else {
+					value.Sites[i].SSLDays = strings.ReplaceAll(days, " days", " ngày")
+				}
+			}
+		}
+		data = value
+	case guideData:
+		value.Language = language
+		data = value
+	case loginData:
+		value.Language = language
+		if language == "vi" && value.Error == "Invalid username or password." {
+			value.Error = "Tên đăng nhập hoặc mật khẩu không đúng."
+		}
+		data = value
+	}
+	if language == "vi" {
+		name = strings.TrimSuffix(name, ".html") + "_vi.html"
+	}
+	s.render(w, name, data)
 }
 
 func (s *Server) render(w http.ResponseWriter, name string, data any) {

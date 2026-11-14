@@ -1,0 +1,28 @@
+{{define "login_vi.html"}}
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Đăng nhập rpctl</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body class="login-page">
+  <main class="login-card">
+    {{template "language-switch" .}}
+    <h1>Proxy ngược &amp; Đường hầm VPN</h1>
+    <p>Bảng quản trị</p>
+    {{if .Error}}<div class="alert error">{{.Error}}</div>{{end}}
+    <form method="post" action="/login">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label>Tên đăng nhập<input name="username" autocomplete="username" required></label>
+      <label>Mật khẩu<input type="password" name="password" autocomplete="current-password" required></label>
+      <button type="submit">Đăng nhập</button>
+    </form>
+  </main>
+  <footer><strong>rpctl v{{.Version}}</strong><span aria-hidden="true">&copy;</span><span>bởi <a href="https://hoanggiangnam.com" target="_blank" rel="noopener noreferrer">Nam Hoàng</a></span></footer>
+</body>
+</html>
+{{end}}

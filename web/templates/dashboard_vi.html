@@ -1,0 +1,259 @@
+{{define "dashboard_vi.html"}}
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Bảng điều khiển rpctl</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header>
+    <div class="brand"><strong>Proxy ngược &amp; đường hầm VPN</strong></div>
+    <nav><a class="active" href="/">Bảng điều khiển</a><a href="/guide">Hướng dẫn cấu hình</a></nav>
+    <div class="header-actions">{{template "language-switch" .}}<a class="github-link" href="/update">Cập nhật</a><a class="github-link" href="https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel" target="_blank" rel="noopener noreferrer">GitHub</a><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="secondary">Đăng xuất</button></form></div>
+  </header>
+  <main>
+    {{template "update-banner-vi" .}}
+    {{if .Message}}<div class="alert">{{.Message}}</div>{{end}}
+    <section>
+      <div class="section-heading">
+        <h2>Hệ thống</h2>
+        <div class="system-actions">
+          <form method="post" action="/system/nginx-restart"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="secondary">Khởi động lại Nginx</button></form>
+          <details class="reboot-confirm"><summary>Khởi động lại VPS</summary><div><p>VPS và tất cả trang web được lưu trữ sẽ tạm thời không truy cập được.</p><form method="post" action="/system/reboot"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="danger">Xác nhận khởi động lại</button></form></div></details>
+        </div>
+      </div>
+      <div class="metrics">
+        <div class="network-metric"><span>IP máy chủ</span><strong>{{.Metrics.ServerIP}}</strong></div>
+        <div class="network-metric"><span>IP VPN</span><strong>{{.Metrics.VPNIP}}</strong></div>
+        <div><span>Thời gian hoạt động</span><strong>{{.Metrics.Uptime}}</strong></div>
+      </div>
+      <dl class="system-details">
+        <div><dt>CPU:</dt><dd>{{.Metrics.CPU}}</dd></div>
+        <div><dt>RAM:</dt><dd>{{.Metrics.RAM}}</dd></div>
+        <div><dt>Bộ nhớ hoán đổi:</dt><dd>{{.Metrics.Swap}}</dd></div>
+        <div><dt>SSD:</dt><dd>{{.Metrics.SSD}}</dd></div>
+        <div><dt>Trang web:</dt><dd>{{len .Sites}}</dd></div>
+      </dl>
+    </section>
+
+    {{if or (eq .VPNMode "wireguard") (eq .VPNMode "")}}
+    <section>
+      <h2>Thiết bị ngang hàng WireGuard - Thêm thiết bị</h2>
+      <form class="peer-form" method="post" action="/wireguard/peer/add">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <label>Tên thiết bị ngang hàng (không bắt buộc)<input name="peer" placeholder="client2" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,31}" maxlength="32"></label>
+        <label>IP VPN nội bộ (không bắt buộc)<input name="vpn_ip_last_octet" type="number" min="1" max="254" step="1" inputmode="numeric" placeholder="Tự động"></label>
+        <button type="submit">Tạo thiết bị ngang hàng</button>
+      </form>
+      <p class="form-hint">Để trống tên để tự động tạo máy khách tiếp theo. IP VPN nội bộ chọn số cuối của địa chỉ VPN (1–254); ví dụ, 25 tạo địa chỉ 10.10.10.25 trên mạng con mặc định. Để trống để tự động cấp phát. Không thể dùng địa chỉ máy chủ, địa chỉ dành riêng hoặc địa chỉ đã được sử dụng. Mỗi mã QR chứa khóa riêng của thiết bị ngang hàng đó; chỉ hiển thị mã cho thiết bị được chỉ định.</p>
+      {{if .PeerError}}
+      <div class="alert error">{{.PeerError}}</div>
+      {{else}}
+      <div class="table-wrap peer-table-wrap">
+        <table class="peer-table">
+          <colgroup>
+            <col class="peer-name-column">
+            <col class="peer-address-column">
+            <col class="peer-mode-column">
+            <col class="peer-qr-column">
+            <col class="peer-config-column">
+            <col class="peer-actions-column">
+          </colgroup>
+          <thead><tr><th>Tên</th><th>Địa chỉ VPN</th><th>Chế độ</th><th>QR</th><th>Cấu hình máy khách</th><th>Thao tác</th></tr></thead>
+          <tbody>
+          {{range .Peers}}
+            <tr>
+              <td data-label="Tên">{{.Name}}</td>
+              <td data-label="Địa chỉ VPN"><code>{{.Address}}</code></td>
+              <td data-label="Chế độ" class="peer-mode-cell"><button type="button" class="peer-mode-switch" role="switch" aria-checked="{{if eq .Mode "full"}}true{{else}}false{{end}}" aria-label="Đường hầm toàn bộ cho {{.Name}}" aria-haspopup="dialog" data-mode-peer="{{.Name}}" data-peer-mode="{{if eq .Mode "full"}}full{{else}}private{{end}}"><span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span><span>{{if eq .Mode "full"}}Đường hầm toàn bộ{{else}}Mạng riêng{{end}}</span></button></td>
+              <td data-label="QR" class="qr-cell"><button type="button" class="qr-view-button" data-qr-peer="{{.Name}}" aria-haspopup="dialog">Xem mã QR</button></td>
+              <td data-label="Cấu hình" class="peer-config-cell"><code>{{.ConfigPath}}</code></td>
+              <td data-label="Thao tác" class="actions-cell peer-actions-cell"><div class="actions-content peer-actions">
+                <form method="post" action="/wireguard/peer/download"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="peer" value="{{.Name}}"><button class="secondary">Tải xuống</button></form>
+                <details class="reboot-confirm peer-delete-confirm"><summary>Xóa</summary><div><p>Xóa thiết bị ngang hàng WireGuard <strong>{{.Name}}</strong>?</p><form method="post" action="/wireguard/peer/delete"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="peer" value="{{.Name}}"><button class="danger">Xác nhận xóa</button></form></div></details>
+              </div></td>
+            </tr>
+          {{else}}
+            <tr><td class="empty" colspan="6">Không có thiết bị ngang hàng WireGuard được quản lý.</td></tr>
+          {{end}}
+          </tbody>
+        </table>
+      </div>
+      <p class="peer-mode-hint">Công tắc chế độ cập nhật cấu hình đã lưu. Sau mỗi thay đổi, hãy nhập tệp .conf mới hoặc quét mã QR mới trên thiết bị, rồi kích hoạt lại đường hầm của thiết bị.</p>
+      <div class="peer-help">
+        <ul>
+          <li><strong>Tên:</strong> tên của thiết bị mới được thêm.</li>
+          <li><strong>Địa chỉ VPN:</strong> địa chỉ IP VPN riêng mà VPS-1 cấp cho thiết bị mới được thêm.</li>
+          <li>Tải xuống tệp cấu hình thiết bị ngang hàng, chẳng hạn <code>client1.conf</code>, để kết nối VPS-2, Windows, Linux hoặc thiết bị khác với VPS-1. <a href="https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel/blob/main/README.md" target="_blank" rel="noopener noreferrer">Hướng dẫn thiết lập</a>.</li>
+          <li>Dùng mã QR để kết nối nhanh thiết bị di động.</li>
+        </ul>
+      </div>
+      {{end}}
+    </section>
+
+    <dialog class="qr-dialog" id="wireguard-qr-dialog" aria-labelledby="wireguard-qr-title">
+      <div class="qr-dialog-content">
+        <div class="qr-dialog-heading">
+          <div>
+            <h2 id="wireguard-qr-title">Mã QR WireGuard</h2>
+            <p id="wireguard-qr-peer"></p>
+          </div>
+          <form method="dialog"><button class="secondary qr-dialog-close" aria-label="Đóng hộp thoại mã QR">Đóng</button></form>
+        </div>
+        <div class="qr-frame">
+          <p id="wireguard-qr-status">Đang tải mã QR...</p>
+          <img id="wireguard-qr-image" hidden alt="">
+        </div>
+        <p class="qr-security-note">Mã QR này chứa khóa riêng của thiết bị ngang hàng. Chỉ quét mã bằng thiết bị được chỉ định.</p>
+      </div>
+    </dialog>
+    <dialog class="mode-dialog" id="wireguard-mode-dialog" aria-labelledby="wireguard-mode-title">
+      <div class="qr-dialog-content">
+        <h2 id="wireguard-mode-title">Thay đổi chế độ WireGuard</h2>
+        <p>Chuyển <strong id="wireguard-mode-peer"></strong> sang <strong id="wireguard-mode-target"></strong>?</p>
+        <p id="wireguard-mode-description"></p>
+        <div class="guide-note"><strong>Cập nhật thiết bị sau khi thay đổi chế độ.</strong> Thiết bị giữ nguyên cài đặt hiện tại cho đến khi bạn thay thế cấu hình.</div>
+        <ol>
+          <li>Tải xuống tệp <code>.conf</code> mới hoặc mở <strong>Xem mã QR</strong> trên màn hình khác.</li>
+          <li>Tắt đường hầm hiện tại của thiết bị. Nhập tệp đã tải xuống hoặc quét mã QR mới để thay thế cấu hình.</li>
+          <li>Kích hoạt đường hầm đã cập nhật.</li>
+        </ol>
+        <p>Địa chỉ VPN và các khóa không thay đổi. Thao tác này thay đổi các tuyến mạng máy khách đã lưu; hãy kiểm tra các tuyến tùy chỉnh trước khi thay thế cấu hình thiết bị.</p>
+        <form method="post" action="/wireguard/peer/mode" id="wireguard-mode-form">
+          <input type="hidden" name="csrf" value="{{.CSRF}}">
+          <input type="hidden" name="peer" id="wireguard-mode-input-peer">
+          <input type="hidden" name="mode" id="wireguard-mode-input-mode">
+          <label class="mode-confirm"><input type="checkbox" name="confirmed" value="yes" required id="wireguard-mode-confirm">Tôi sẽ cập nhật cấu hình thiết bị hoặc quét mã QR mới của thiết bị.</label>
+          <div class="mode-dialog-actions"><button type="button" class="secondary" id="wireguard-mode-cancel">Hủy</button><button type="submit" id="wireguard-mode-submit">Thay đổi chế độ</button></div>
+        </form>
+      </div>
+    </dialog>
+    {{else if eq .VPNMode "tailscale"}}
+    <section>
+      <div class="section-heading">
+        <div>
+          <h2>Mạng Tailscale</h2>
+          <p class="form-hint">Các thiết bị tham gia mạng này bằng cách đăng nhập vào cùng một tailnet. Việc phê duyệt thiết bị và các quy tắc truy cập được quản lý trong bảng quản trị Tailscale.</p>
+        </div>
+        <a class="button-link secondary" href="https://login.tailscale.com/admin/machines" target="_blank" rel="noopener noreferrer">Mở bảng quản trị</a>
+      </div>
+      {{if .TailscaleError}}
+      <div class="alert error">{{.TailscaleError}}</div>
+      {{else}}
+      <dl class="tailscale-summary">
+        <div><dt>Trạng thái</dt><dd>{{.Tailscale.BackendState}}</dd></div>
+        <div><dt>Tailnet</dt><dd>{{if .Tailscale.Tailnet}}{{.Tailscale.Tailnet}}{{else}}không khả dụng{{end}}</dd></div>
+        <div><dt>Thiết bị này</dt><dd>{{.Tailscale.Self.Name}}</dd></div>
+        <div><dt>IP Tailscale</dt><dd>{{range .Tailscale.Self.IPs}}<code>{{.}}</code> {{else}}không khả dụng{{end}}</dd></div>
+      </dl>
+      <div class="table-wrap">
+        <table class="tailscale-table">
+          <thead><tr><th>Thiết bị</th><th>IP Tailscale</th><th>Tên DNS</th><th>Hệ điều hành</th><th>Trạng thái</th></tr></thead>
+          <tbody>
+          {{range .Tailscale.Peers}}
+            <tr>
+              <td data-label="Thiết bị">{{.Name}}</td>
+              <td data-label="IP Tailscale">{{range .IPs}}<code>{{.}}</code> {{else}}—{{end}}</td>
+              <td data-label="Tên DNS">{{if .DNSName}}<code>{{.DNSName}}</code>{{else}}—{{end}}</td>
+              <td data-label="Hệ điều hành">{{if .OS}}{{.OS}}{{else}}—{{end}}</td>
+              <td data-label="Trạng thái"><span class="status {{if .Online}}enabled{{else}}disabled{{end}}">{{if .Online}}trực tuyến{{else}}ngoại tuyến{{end}}</span></td>
+            </tr>
+          {{else}}
+            <tr><td class="empty" colspan="5">Không có thiết bị Tailscale nào khác được trả về.</td></tr>
+          {{end}}
+          </tbody>
+        </table>
+      </div>
+      <div class="peer-help"><ul>
+        <li>Cài đặt Tailscale trên từng máy chủ hoặc thiết bị di động và đăng nhập vào cùng một tailnet.</li>
+        <li>Dùng địa chỉ <code>100.x.x.x</code> hoặc tên MagicDNS của thiết bị làm máy chủ đích cho proxy ngược.</li>
+        <li>Quyền truy cập phụ thuộc vào các quyền được cấp hoặc ACL được cấu hình cho tailnet.</li>
+        <li><a href="https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel/blob/main/README.md" target="_blank" rel="noopener noreferrer">Hướng dẫn thiết lập</a>.</li>
+      </ul></div>
+      {{end}}
+    </section>
+    {{else}}
+    <section>
+      <h2>VPN</h2>
+      <p>Chưa cấu hình hệ thống VPN. Các proxy ngược vẫn có thể dùng địa chỉ máy chủ đích công khai hoặc riêng tư mà VPS này truy cập được.</p>
+    </section>
+    {{end}}
+
+    <section>
+      <h2>Thêm proxy</h2>
+      <form class="inline-form" method="post" action="/proxy/add">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <label>Tên miền<input name="domain" placeholder="app.example.com" required></label>
+        <label>Máy chủ đích<input name="upstream" placeholder="{{if eq .VPNMode "tailscale"}}http://100.64.0.2:80{{else}}http://10.10.10.2:80{{end}}" required></label>
+        <button type="submit">Thêm</button>
+      </form>
+      <div class="proxy-help">
+        {{if eq .VPNMode "tailscale"}}
+        <p><strong>Ví dụ:</strong> <code>shop.example.com</code> &rarr; VPS-1 &rarr; Tailscale &rarr; Máy chủ web VPS-2(<code>http://100.64.0.25:80</code>)</p>
+        {{else}}
+        <p><strong>Ví dụ:</strong> <code>shop.example.com</code> &rarr; VPS-1(<code>10.10.10.1</code>) &rarr; WireGuard &rarr; Máy chủ web VPS-2(<code>http://10.10.10.25:80</code>)</p>
+        {{end}}
+        <ul>
+          <li><strong>Tên miền:</strong> tên máy chủ công khai mà khách truy cập dùng để truy cập trang web hoặc ứng dụng của bạn.</li>
+          <li><strong>Máy chủ đích:</strong> địa chỉ HTTP của máy chủ web mà VPS-1 chuyển tiếp yêu cầu đến, chẳng hạn {{if eq .VPNMode "tailscale"}}<code>http://100.64.0.25:80</code> hoặc tên MagicDNS{{else}}<code>http://10.10.10.25:80</code> hoặc <code>http://10.10.10.212:3000</code>{{end}}.</li>
+          <li>Trang web hoặc ứng dụng phải đang chạy trên thiết bị đích và VPS-1 phải truy cập được địa chỉ của thiết bị đó.</li>
+          <li>Sau khi thêm proxy, hãy dùng mục <strong>Proxy ngược</strong> để cấp chứng chỉ SSL cho tên miền.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section>
+      <h2>Proxy ngược</h2>
+      <p class="form-hint">Cột SSL hiển thị thời gian hiệu lực còn lại của chứng chỉ. Bộ hẹn giờ systemd hằng ngày yêu cầu acme.sh tự động gia hạn chứng chỉ trước khi hết hạn.</p>
+      <div class="table-wrap">
+        <table class="proxy-table">
+          <thead><tr><th>Tên miền</th><th>Máy chủ đích</th><th>Trạng thái</th><th>SSL</th><th>Thao tác</th></tr></thead>
+          <tbody>
+          {{range .Sites}}
+            <tr>
+              <td data-label="Tên miền"><a href="{{if .SSLEnabled}}https{{else}}http{{end}}://{{.Domain}}" target="_blank" rel="noopener noreferrer">{{.Domain}}</a></td><td data-label="Máy chủ đích"><code>{{.Upstream}}</code></td>
+              <td data-label="Trạng thái">{{if .Enabled}}đã bật{{else}}đã tắt{{end}}</td>
+              <td data-label="SSL" class="ssl-cell">
+                <div class="ssl-content">
+                {{if .SSLEnabled}}
+                <span class="ssl-days {{.SSLDaysClass}}" title="{{.SSLError}}"><strong>{{.SSLDays}}</strong>{{if .SSLExpiry}}<small>Hết hạn {{.SSLExpiry}}</small>{{end}}</span>
+                <form method="post" action="/ssl/renew"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="domain" value="{{.Domain}}"><button class="secondary">Gia hạn chứng chỉ</button></form>
+                {{else}}
+                <form method="post" action="/ssl/issue"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="domain" value="{{.Domain}}"><button>Cấp chứng chỉ</button></form>
+                {{end}}
+                </div>
+              </td>
+              <td data-label="Thao tác" class="actions-cell"><div class="actions-content">
+                {{if eq .Domain $.PanelDomain}}
+                <span class="panel-label">Bảng điều khiển quản trị web</span>{{if $.PublicURL}}<a class="public-panel-url" href="{{$.PublicURL}}" target="_blank" rel="noopener noreferrer">{{$.PublicURL}}</a>{{end}}
+                {{else}}
+                <form class="edit-form" method="post" action="/proxy/edit"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="domain" value="{{.Domain}}"><input name="upstream" value="{{.Upstream}}" aria-label="Máy chủ đích cho {{.Domain}}" required><button class="secondary">Cập nhật</button></form>
+                {{if .Enabled}}
+                <form method="post" action="/proxy/disable"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="domain" value="{{.Domain}}"><button class="secondary">Tắt</button></form>
+                {{else}}
+                <form method="post" action="/proxy/enable"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="domain" value="{{.Domain}}"><button>Bật</button></form>
+                {{end}}
+                <form method="post" action="/proxy/delete"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="domain" value="{{.Domain}}"><button class="danger">Xóa</button></form>
+                {{end}}
+              </div></td>
+            </tr>
+          {{else}}
+            <tr><td class="empty" colspan="5">Không có trang web được quản lý.</td></tr>
+          {{end}}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <footer>
+    <button type="button" class="version-check" id="version-check" data-version="v{{.Version}}" title="Kiểm tra bản cập nhật">rpctl v{{.Version}}</button>
+    <span class="version-check-status" id="version-check-status" role="status" aria-live="polite"></span>
+    <span aria-hidden="true">&copy;</span><span>bởi <a href="https://hoanggiangnam.com" target="_blank" rel="noopener noreferrer">Nam Hoàng</a></span>
+  </footer>
+</body>
+</html>
+{{end}}

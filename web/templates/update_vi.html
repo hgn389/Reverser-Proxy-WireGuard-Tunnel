@@ -1,0 +1,42 @@
+{{define "update_vi.html"}}
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Cập nhật rpctl</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header>
+    <div class="brand"><strong>Proxy ngược &amp; Đường hầm VPN</strong></div>
+    <nav><a href="/">Bảng điều khiển</a><a href="/guide">Hướng dẫn cấu hình</a></nav>
+    <div class="header-actions">{{template "language-switch" .}}<a class="github-link active" href="/update" aria-current="page">Cập nhật</a><a class="github-link" href="https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel" target="_blank" rel="noopener noreferrer">GitHub</a><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="secondary">Đăng xuất</button></form></div>
+  </header>
+  <main>
+    {{template "update-banner-vi" .}}
+    <section>
+      <h1>Cập nhật phần mềm</h1>
+      <p>Kiểm tra bản phát hành mới nhất trên GitHub và cài đặt bản cập nhật đã được xác minh mã kiểm tra. Quá trình cài đặt chỉ bắt đầu khi bạn chọn Cài đặt bản cập nhật.</p>
+      <dl class="update-details">
+        <dt>Phiên bản đã cài đặt</dt><dd>v{{.Version}}</dd>
+        <dt>Phiên bản mới nhất</dt><dd id="update-latest">Chưa kiểm tra</dd>
+        <dt>Lần kiểm tra gần nhất</dt><dd id="update-checked">Chưa kiểm tra</dd>
+      </dl>
+      <p class="version-check-status" id="version-check-status" role="status" aria-live="polite">Đang kiểm tra bản cập nhật...</p>
+      <button type="button" class="update-check" id="version-check" data-version="v{{.Version}}" title="Kiểm tra bản cập nhật">Kiểm tra bản cập nhật</button>
+      <form method="post" action="/system/update" id="update-install-form">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <p>Tệp thực thi và SHA256SUMS được tải xuống từ bản phát hành chính thức trên GitHub. Bảng điều khiển có thể khởi động lại và ngắt kết nối trong chốc lát. Cài đặt trang web và VPN được giữ nguyên. Kết quả sẽ hiển thị trên Bảng điều khiển.</p>
+        <button type="submit" id="update-install" disabled>Cài đặt bản cập nhật</button>
+      </form>
+      <p>Hệ thống tự động kiểm tra khi khởi động và mỗi giờ. Thông báo kèm biểu tượng sẽ xuất hiện khi có phiên bản mới hơn. Bản cập nhật không bao giờ được cài đặt tự động.</p>
+      <p><a href="https://github.com/hgn389/Reverser-Proxy-WireGuard-Tunnel/releases" target="_blank" rel="noopener noreferrer">Xem ghi chú phát hành trên GitHub</a></p>
+    </section>
+  </main>
+  <footer><strong>rpctl v{{.Version}}</strong><span aria-hidden="true">&copy;</span><span>Phát triển bởi <a href="https://hoanggiangnam.com" target="_blank" rel="noopener noreferrer">Nam Hoang</a></span></footer>
+</body>
+</html>
+{{end}}

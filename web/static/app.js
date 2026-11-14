@@ -1,6 +1,13 @@
 (() => {
   "use strict";
 
+  const vi = document.documentElement.lang === "vi";
+  const text = (en, vietnamese) => vi ? vietnamese : en;
+  document.querySelector("#language-switch")?.addEventListener("click", () => {
+    document.cookie = `rpctl-language=${vi ? "en" : "vi"}; Path=/; Max-Age=31536000; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
+    location.reload();
+  });
+
   const setupWireGuardQR = () => {
     const dialog = document.querySelector("#wireguard-qr-dialog");
     const image = document.querySelector("#wireguard-qr-image");
@@ -19,10 +26,10 @@
         }
 
         peerLabel.textContent = peer;
-        status.textContent = "Loading QR code...";
+        status.textContent = text("Loading QR code...", "Đang tải mã QR...");
         status.hidden = false;
         image.hidden = true;
-        image.alt = `WireGuard QR code for ${peer}`;
+        image.alt = text(`WireGuard QR code for ${peer}`, `Mã QR WireGuard cho ${peer}`);
         image.src = `/wireguard/peer/qr?peer=${encodeURIComponent(peer)}`;
         dialog.showModal();
       });
@@ -35,7 +42,7 @@
 
     image.addEventListener("error", () => {
       image.hidden = true;
-      status.textContent = "The QR code could not be loaded.";
+      status.textContent = text("The QR code could not be loaded.", "Không tải được mã QR.");
       status.hidden = false;
     });
 
@@ -68,15 +75,15 @@
       button.addEventListener("click", () => {
         const full = button.dataset.peerMode !== "full";
         peerLabel.textContent = button.dataset.modePeer;
-        targetLabel.textContent = full ? "Full tunnel" : "Private network";
+        targetLabel.textContent = full ? text("Full tunnel", "Toàn bộ lưu lượng") : text("Private network", "Mạng riêng");
         description.textContent = full
-          ? "Internet IPv4 traffic will use VPS-1's public IPv4 address. VPS-1 will enable IPv4 forwarding and NAT for the WireGuard subnet. IPv6 is not routed by this mode."
-          : "Only traffic to the WireGuard subnet will use the VPN. Internet traffic will use the device's normal connection.";
+          ? text("Internet IPv4 traffic will use VPS-1's public IPv4 address. VPS-1 will enable IPv4 forwarding and NAT for the WireGuard subnet. IPv6 is not routed by this mode.", "Lưu lượng Internet IPv4 sẽ dùng địa chỉ IPv4 công khai của VPS-1. VPS-1 bật chuyển tiếp IPv4 và NAT cho mạng WireGuard. Chế độ này không định tuyến IPv6.")
+          : text("Only traffic to the WireGuard subnet will use the VPN. Internet traffic will use the device's normal connection.", "Chỉ lưu lượng đến mạng WireGuard đi qua VPN. Lưu lượng Internet dùng kết nối thông thường của thiết bị.");
         peerInput.value = button.dataset.modePeer;
         modeInput.value = full ? "full" : "private";
         confirm.checked = false;
         submit.disabled = false;
-        submit.textContent = "Change mode";
+        submit.textContent = text("Change mode", "Đổi chế độ");
         dialog.showModal();
       });
     });
@@ -91,7 +98,7 @@
     });
     form.addEventListener("submit", () => {
       submit.disabled = true;
-      submit.textContent = "Changing mode...";
+      submit.textContent = text("Changing mode...", "Đang đổi chế độ...");
     });
   };
 
@@ -126,7 +133,7 @@
       if (announce && versionCheck) {
         versionCheck.disabled = true;
         versionCheck.setAttribute("aria-busy", "true");
-        setCheckStatus("Checking for updates...");
+        setCheckStatus(text("Checking for updates...", "Đang kiểm tra cập nhật..."));
       }
       try {
         const endpoint = force ? "/system/update-status?refresh=1" : "/system/update-status";
@@ -139,19 +146,20 @@
           throw new Error(`HTTP ${response.status}`);
         }
         const update = await response.json();
-        if (latest) latest.textContent = update.latest || "Unknown";
-        if (checked) checked.textContent = update.checked_at ? new Date(update.checked_at).toLocaleString() : "Unknown";
+        if (installForm?.dataset.installing) return;
+        if (latest) latest.textContent = update.latest || text("Unknown", "Chưa xác định");
+        if (checked) checked.textContent = update.checked_at ? new Date(update.checked_at).toLocaleString(vi ? "vi-VN" : "en-US") : text("Unknown", "Chưa xác định");
         if (install) install.disabled = !update.available || !update.latest;
         if (!update.available || !update.latest) {
           banner.hidden = true;
           if (announce || latest) {
-            setCheckStatus(`${update.current || versionCheck?.dataset.version || "Installed version"} is up to date.`, "current");
+            setCheckStatus(text(`${update.current || versionCheck?.dataset.version || "Installed version"} is up to date.`, `${update.current || versionCheck?.dataset.version || "Phiên bản đang cài"} đã là bản mới nhất.`), "current");
           }
           return;
         }
         version.textContent = update.latest;
         if (announce || latest) {
-          setCheckStatus(`New version ${update.latest} is available.`, "available");
+          setCheckStatus(text(`New version ${update.latest} is available.`, `Đã có phiên bản mới ${update.latest}.`), "available");
         }
         let dismissed = null;
         try {
@@ -170,10 +178,10 @@
         }
       } catch (_) {
         if (announce || latest) {
-          setCheckStatus("Update check failed. Try again.", "error");
+          setCheckStatus(text("Update check failed. Try again.", "Kiểm tra cập nhật thất bại. Vui lòng thử lại."), "error");
         }
-        if (latest) latest.textContent = "Unavailable";
-        if (checked) checked.textContent = "Check failed";
+        if (latest) latest.textContent = text("Unavailable", "Không khả dụng");
+        if (checked) checked.textContent = text("Check failed", "Kiểm tra thất bại");
         // Keep the dashboard usable when GitHub or the network is unavailable.
       } finally {
         if (announce && versionCheck) {
@@ -197,15 +205,15 @@
     });
 
     if (installForm) installForm.addEventListener("submit", (event) => {
-      if (!install || install.disabled || !window.confirm("Install the latest verified release? The panel may restart briefly.")) {
+      if (!install || install.disabled || !window.confirm(text("Install the latest verified release? The panel may restart briefly.", "Cài bản phát hành mới nhất đã xác minh? Bảng điều khiển có thể khởi động lại trong chốc lát."))) {
         event.preventDefault();
         return;
       }
       installForm.dataset.installing = "true";
       install.disabled = true;
-      install.textContent = "Installing update...";
+      install.textContent = text("Installing update...", "Đang cài cập nhật...");
       if (versionCheck) versionCheck.disabled = true;
-      setCheckStatus("Installing update. The panel may briefly disconnect; reconnect after it restarts.");
+      setCheckStatus(text("Installing update. The panel may briefly disconnect; reconnect after it restarts.", "Đang cài cập nhật. Bảng điều khiển có thể mất kết nối ngắn; hãy kết nối lại sau khi khởi động xong."));
     });
 
     void refresh();
