@@ -193,6 +193,7 @@ pre { overflow-x: auto; padding: 1rem; border: 1px solid #30363d; border-radius:
 .guide-copy-target > code { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .guide-snippet { position: relative; }
 .guide .guide-snippet > pre { padding: .65rem 3.5rem .65rem .75rem; border: 1px solid #30363d; border-radius: 6px; background: #111418; white-space: pre; }
+.guide pre > code { white-space: pre; }
 .guide .guide-snippet-copy { position: absolute; top: .4rem; right: .4rem; padding: .3rem; border-radius: 4px; background: #30363d; }
 .guide-snippet-copy > svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; }
 .guide-snippet-copy.copied > svg:first-child { display: none; }

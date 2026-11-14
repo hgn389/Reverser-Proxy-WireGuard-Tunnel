@@ -599,6 +599,9 @@ func TestVietnameseTemplatesAndUpdateStyles(t *testing.T) {
 	if !strings.Contains(string(css), "background: #111418") || !strings.Contains(string(css), ".copied > .guide-copy-marker") {
 		t.Error("command background and persistent checkmark styles missing")
 	}
+	if !strings.Contains(string(css), ".guide pre > code { white-space: pre; }") {
+		t.Error("guide code must preserve newlines instead of inheriting the global nowrap rule")
+	}
 }
 
 func TestInvalidHostIsRejected(t *testing.T) {
